@@ -1,0 +1,473 @@
+### Store Management API - REST Client Tests
+### Configure these variables based on your setup
+@baseUrl = https://localhost:7000
+@token = your_jwt_token_here
+
+### ============================================
+### AUTHENTICATION
+### ============================================
+
+### 1. Login as Admin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "123456"
+}
+
+### 2. Login as Staff
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "staff01",
+  "password": "123456"
+}
+
+### 3. Register New User
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "newstaff",
+  "password": "123456",
+  "fullName": "New Staff Member",
+  "role": "staff"
+}
+
+### ============================================
+### PRODUCTS
+### ============================================
+
+### 4. Get All Products (Public - No Auth Required)
+GET {{baseUrl}}/api/products
+
+### 5. Get Product by ID
+GET {{baseUrl}}/api/products/1
+Authorization: Bearer {{token}}
+
+### 6. Create New Product (Admin only)
+POST {{baseUrl}}/api/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "categoryId": 1,
+  "supplierId": 1,
+  "productName": "Test Product API",
+  "barcode": "TEST999",
+  "price": 25000,
+  "unit": "cái",
+  "initialStock": 50
+}
+
+### 7. Update Product Price (Admin only)
+PUT {{baseUrl}}/api/products/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "price": 320000
+}
+
+### 8. Update Stock Quantity
+PUT {{baseUrl}}/api/products/stock
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "productId": 1,
+  "quantity": 100
+}
+
+### 9. Delete Product (Admin only)
+DELETE {{baseUrl}}/api/products/51
+Authorization: Bearer {{token}}
+
+### ============================================
+### ORDERS
+### ============================================
+
+### 10. Get All Orders
+GET {{baseUrl}}/api/orders
+Authorization: Bearer {{token}}
+
+### 11. Get Order by ID
+GET {{baseUrl}}/api/orders/1
+Authorization: Bearer {{token}}
+
+### 12. Create New Order with Promotion
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "customerId": 1,
+  "userId": 1,
+  "promoCode": "SALE10",
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2
+    },
+    {
+      "productId": 2,
+      "quantity": 1
+    },
+    {
+      "productId": 5,
+      "quantity": 3
+    }
+  ]
+}
+
+### 13. Create Order without Promotion
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "customerId": 2,
+  "userId": 1,
+  "items": [
+    {
+      "productId": 10,
+      "quantity": 1
+    }
+  ]
+}
+
+### 14. Update Order Status to Paid
+PUT {{baseUrl}}/api/orders/31/status
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+"paid"
+
+### 15. Update Order Status to Canceled
+PUT {{baseUrl}}/api/orders/32/status
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+"canceled"
+
+### 16. Process Payment for Order
+POST {{baseUrl}}/api/orders/payment
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "orderId": 31,
+  "amount": 500000,
+  "paymentMethod": "cash"
+}
+
+### 17. Process Payment - Card
+POST {{baseUrl}}/api/orders/payment
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "orderId": 32,
+  "amount": 300000,
+  "paymentMethod": "card"
+}
+
+### ============================================
+### CUSTOMERS
+### ============================================
+
+### 18. Get All Customers
+GET {{baseUrl}}/api/customers
+Authorization: Bearer {{token}}
+
+### 19. Get Customer by ID
+GET {{baseUrl}}/api/customers/1
+Authorization: Bearer {{token}}
+
+### 20. Create New Customer
+POST {{baseUrl}}/api/customers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Nguyễn Test API",
+  "phone": "0909111222",
+  "email": "testapi@example.com",
+  "address": "123 Test Street, Hanoi"
+}
+
+### 21. Update Customer
+PUT {{baseUrl}}/api/customers/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Khách hàng 1 Updated",
+  "phone": "0909000001",
+  "email": "kh1.updated@mail.com",
+  "address": "Địa chỉ mới 1, TP.HCM"
+}
+
+### 22. Delete Customer
+DELETE {{baseUrl}}/api/customers/21
+Authorization: Bearer {{token}}
+
+### ============================================
+### CATEGORIES
+### ============================================
+
+### 23. Get All Categories (Public)
+GET {{baseUrl}}/api/categories
+
+### 24. Get Category by ID
+GET {{baseUrl}}/api/categories/1
+Authorization: Bearer {{token}}
+
+### 25. Create Category (Admin only)
+POST {{baseUrl}}/api/categories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "categoryName": "Đồ điện tử"
+}
+
+### 26. Update Category (Admin only)
+PUT {{baseUrl}}/api/categories/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "categoryName": "Đồ uống - Updated"
+}
+
+### 27. Delete Category (Admin only)
+DELETE {{baseUrl}}/api/categories/6
+Authorization: Bearer {{token}}
+
+### ============================================
+### SUPPLIERS
+### ============================================
+
+### 28. Get All Suppliers (Admin only)
+GET {{baseUrl}}/api/suppliers
+Authorization: Bearer {{token}}
+
+### 29. Get Supplier by ID (Admin only)
+GET {{baseUrl}}/api/suppliers/1
+Authorization: Bearer {{token}}
+
+### 30. Create Supplier (Admin only)
+POST {{baseUrl}}/api/suppliers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Công ty Test API",
+  "phone": "0909555666",
+  "email": "testapi@supplier.com",
+  "address": "456 Supplier Street, Da Nang"
+}
+
+### 31. Update Supplier (Admin only)
+PUT {{baseUrl}}/api/suppliers/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Công ty ABC - Updated",
+  "phone": "0909123456",
+  "email": "abc.updated@gmail.com",
+  "address": "Hà Nội - Updated"
+}
+
+### 32. Delete Supplier (Admin only)
+DELETE {{baseUrl}}/api/suppliers/4
+Authorization: Bearer {{token}}
+
+### ============================================
+### PROMOTIONS
+### ============================================
+
+### 33. Get All Promotions (Public)
+GET {{baseUrl}}/api/promotions
+
+### 34. Get Active Promotions (Public)
+GET {{baseUrl}}/api/promotions/active
+
+### 35. Get Promotion by Code (Public)
+GET {{baseUrl}}/api/promotions/code/SALE10
+
+### 36. Get Promotion by ID (Admin)
+GET {{baseUrl}}/api/promotions/1
+Authorization: Bearer {{token}}
+
+### 37. Create Promotion (Admin only)
+POST {{baseUrl}}/api/promotions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "promoCode": "TESTAPI",
+  "description": "Test API Promotion - Giảm 15%",
+  "discountType": "percent",
+  "discountValue": 15,
+  "startDate": "2025-10-01",
+  "endDate": "2025-12-31",
+  "minOrderAmount": 100000,
+  "usageLimit": 50,
+  "status": "active"
+}
+
+### 38. Create Fixed Discount Promotion (Admin)
+POST {{baseUrl}}/api/promotions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "promoCode": "FIXED20K",
+  "description": "Giảm 20,000đ",
+  "discountType": "fixed",
+  "discountValue": 20000,
+  "startDate": "2025-10-01",
+  "endDate": "2025-12-31",
+  "minOrderAmount": 50000,
+  "usageLimit": 0,
+  "status": "active"
+}
+
+### 39. Update Promotion (Admin only)
+PUT {{baseUrl}}/api/promotions/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "promoCode": "SALE10",
+  "description": "Giảm 10% - Updated",
+  "discountType": "percent",
+  "discountValue": 10,
+  "startDate": "2025-01-01",
+  "endDate": "2025-12-31",
+  "minOrderAmount": 0,
+  "usageLimit": 0,
+  "status": "active"
+}
+
+### 40. Deactivate Promotion (Admin only)
+PUT {{baseUrl}}/api/promotions/6
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "inactive"
+}
+
+### 41. Delete Promotion (Admin only)
+DELETE {{baseUrl}}/api/promotions/6
+Authorization: Bearer {{token}}
+
+### ============================================
+### COMPLEX SCENARIOS
+### ============================================
+
+### 42. Complete Order Flow
+# Step 1: Login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "staff01",
+  "password": "123456"
+}
+
+### 43. Step 2: Check Products & Stock
+GET {{baseUrl}}/api/products
+
+### 44. Step 3: Check Active Promotions
+GET {{baseUrl}}/api/promotions/active
+
+### 45. Step 4: Create Order
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "customerId": 5,
+  "userId": 2,
+  "promoCode": "SALE10",
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2
+    },
+    {
+      "productId": 5,
+      "quantity": 1
+    },
+    {
+      "productId": 10,
+      "quantity": 3
+    }
+  ]
+}
+
+### 46. Step 5: Process Payment
+POST {{baseUrl}}/api/orders/payment
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "orderId": 31,
+  "amount": 800000,
+  "paymentMethod": "e-wallet"
+}
+
+### 47. Step 6: Verify Order Status
+GET {{baseUrl}}/api/orders/31
+Authorization: Bearer {{token}}
+
+### 48. Step 7: Check Updated Stock
+GET {{baseUrl}}/api/products/1
+Authorization: Bearer {{token}}
+
+### ============================================
+### NOTES & TIPS
+### ============================================
+# 
+# SETUP:
+# 1. Update @baseUrl with your actual port (check terminal output)
+# 2. Login first to get JWT token
+# 3. Copy token from response and update @token variable
+# 4. Or replace {{token}} directly in Authorization headers
+#
+# PUBLIC ENDPOINTS (No auth required):
+# - GET /api/products
+# - GET /api/categories
+# - GET /api/promotions
+# - GET /api/promotions/active
+# - GET /api/promotions/code/{code}
+#
+# ADMIN ONLY ENDPOINTS:
+# - POST/PUT/DELETE /api/products
+# - POST/PUT/DELETE /api/categories
+# - POST/PUT/DELETE /api/suppliers
+# - POST/PUT/DELETE /api/promotions
+#
+# TESTING TIPS:
+# - Use VS Code REST Client extension to run these requests
+# - Check terminal logs for detailed errors
+# - Verify MySQL is running
+# - Token expires after 24 hours - login again if needed
+# - Check inventory after creating orders
+# - Test with different roles (admin vs staff)
+#
+# COMMON ERRORS:
+# - 401 Unauthorized: Token missing or invalid
+# - 403 Forbidden: Insufficient permissions (need admin)
+# - 400 Bad Request: Invalid data or business logic error
+# - 404 Not Found: Resource doesn't exist
+#
+### ============================================
+

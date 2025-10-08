@@ -12,6 +12,7 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string;
+  userId: number;
   username: string;
   fullName: string;
   role: string;
@@ -108,10 +109,18 @@ export interface OrderResponse {
   discountAmount: number;
   finalAmount: number;
   items: OrderItemResponse[];
+  paymentMethod?: string;
+  paymentDate?: string;
+  paymentAmount?: number;
 }
 
 export interface PaymentDto {
   orderId: number;
   amount: number;
   paymentMethod: "cash" | "card" | "bank_transfer" | "e-wallet";
+}
+
+export interface UpdateOrderStatusDto {
+  status: string;
+  paymentMethod?: string;
 }

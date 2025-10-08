@@ -11,7 +11,7 @@ namespace StoreManagementAPI.Services
         Task<OrderResponseDto?> CreateOrderAsync(CreateOrderDto dto);
         Task<OrderResponseDto?> GetOrderByIdAsync(int id);
         Task<IEnumerable<OrderResponseDto>> GetAllOrdersAsync();
-        Task<bool> UpdateOrderStatusAsync(int orderId, string status);
+        Task<bool> UpdateOrderStatusAsync(int orderId, string status, string? paymentMethod = null);
         Task<bool> ProcessPaymentAsync(PaymentDto dto);
     }
 
@@ -151,9 +151,12 @@ namespace StoreManagementAPI.Services
                 .Include(o => o.User)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
+                .Include(o => o.Payments)
                 .FirstOrDefaultAsync(o => o.OrderId == id);
 
             if (order == null) return null;
+
+            var payment = order.Payments.FirstOrDefault();
 
             return new OrderResponseDto
             {
@@ -167,6 +170,9 @@ namespace StoreManagementAPI.Services
                 TotalAmount = order.TotalAmount,
                 DiscountAmount = order.DiscountAmount,
                 FinalAmount = order.TotalAmount - order.DiscountAmount,
+                PaymentMethod = payment?.PaymentMethod,
+                PaymentDate = payment?.PaymentDate,
+                PaymentAmount = payment?.Amount,
                 Items = order.OrderItems.Select(oi => new OrderItemResponseDto
                 {
                     ProductId = oi.ProductId ?? 0,
@@ -185,38 +191,59 @@ namespace StoreManagementAPI.Services
                 .Include(o => o.User)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
+                .Include(o => o.Payments)
                 .OrderByDescending(o => o.OrderDate)
                 .ToListAsync();
 
-            return orders.Select(order => new OrderResponseDto
-            {
-                OrderId = order.OrderId,
-                CustomerId = order.CustomerId,
-                CustomerName = order.Customer?.Name,
-                UserId = order.UserId,
-                UserName = order.User?.FullName,
-                OrderDate = order.OrderDate,
-                Status = order.Status,
-                TotalAmount = order.TotalAmount,
-                DiscountAmount = order.DiscountAmount,
-                FinalAmount = order.TotalAmount - order.DiscountAmount,
-                Items = order.OrderItems.Select(oi => new OrderItemResponseDto
+            return orders.Select(order => {
+                var payment = order.Payments.FirstOrDefault();
+                return new OrderResponseDto
                 {
-                    ProductId = oi.ProductId ?? 0,
-                    ProductName = oi.Product?.ProductName ?? "",
-                    Quantity = oi.Quantity,
-                    Price = oi.Price,
-                    Subtotal = oi.Subtotal
-                }).ToList()
+                    OrderId = order.OrderId,
+                    CustomerId = order.CustomerId,
+                    CustomerName = order.Customer?.Name,
+                    UserId = order.UserId,
+                    UserName = order.User?.FullName,
+                    OrderDate = order.OrderDate,
+                    Status = order.Status,
+                    TotalAmount = order.TotalAmount,
+                    DiscountAmount = order.DiscountAmount,
+                    FinalAmount = order.TotalAmount - order.DiscountAmount,
+                    PaymentMethod = payment?.PaymentMethod,
+                    PaymentDate = payment?.PaymentDate,
+                    PaymentAmount = payment?.Amount,
+                    Items = order.OrderItems.Select(oi => new OrderItemResponseDto
+                    {
+                        ProductId = oi.ProductId ?? 0,
+                        ProductName = oi.Product?.ProductName ?? "",
+                        Quantity = oi.Quantity,
+                        Price = oi.Price,
+                        Subtotal = oi.Subtotal
+                    }).ToList()
+                };
             });
         }
 
-        public async Task<bool> UpdateOrderStatusAsync(int orderId, string status)
+        public async Task<bool> UpdateOrderStatusAsync(int orderId, string status, string? paymentMethod = null)
         {
             var order = await _orderRepository.GetByIdAsync(orderId);
             if (order == null) return false;
 
             order.Status = status;
+            
+            // If status is paid and payment method is provided, create payment record
+            if (status == "paid" && !string.IsNullOrEmpty(paymentMethod))
+            {
+                var payment = new Payment
+                {
+                    OrderId = orderId,
+                    Amount = order.TotalAmount - order.DiscountAmount,
+                    PaymentMethod = paymentMethod,
+                    PaymentDate = DateTime.Now
+                };
+                await _paymentRepository.AddAsync(payment);
+            }
+            
             await _orderRepository.UpdateAsync(order);
             return true;
         }

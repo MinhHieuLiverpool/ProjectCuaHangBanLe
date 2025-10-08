@@ -41,6 +41,7 @@ namespace StoreManagementAPI.Services
             return new LoginResponseDto
             {
                 Token = token,
+                UserId = user.UserId,
                 Username = user.Username,
                 FullName = user.FullName ?? "",
                 Role = user.Role

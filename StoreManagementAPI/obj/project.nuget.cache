@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "TZCU471XNFc=",
+  "dgSpecHash": "bcRSywNxJnI=",
   "success": true,
-  "projectFilePath": "D:\\Downloads\\project_cuahangbanle\\StoreManagementAPI\\StoreManagementAPI.csproj",
+  "projectFilePath": "C:\\Users\\ASUS Vivobook\\Desktop\\ProjectCuaHangBanLe\\StoreManagementAPI\\StoreManagementAPI.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\ASUS Vivobook\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\ASUS Vivobook\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\8.0.11\\microsoft.aspnetcore.authentication.jwtbearer.8.0.11.nupkg.sha512",

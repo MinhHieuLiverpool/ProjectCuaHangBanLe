@@ -27,6 +27,11 @@ namespace StoreManagementAPI.DTOs
         public decimal DiscountAmount { get; set; }
         public decimal FinalAmount { get; set; }
         public List<OrderItemResponseDto> Items { get; set; } = new();
+        
+        // Payment information
+        public string? PaymentMethod { get; set; }
+        public DateTime? PaymentDate { get; set; }
+        public decimal? PaymentAmount { get; set; }
     }
 
     public class OrderItemResponseDto
@@ -43,5 +48,11 @@ namespace StoreManagementAPI.DTOs
         public int OrderId { get; set; }
         public decimal Amount { get; set; }
         public string PaymentMethod { get; set; } = "cash";
+    }
+
+    public class UpdateOrderStatusDto
+    {
+        public string Status { get; set; } = string.Empty;
+        public string? PaymentMethod { get; set; }
     }
 }

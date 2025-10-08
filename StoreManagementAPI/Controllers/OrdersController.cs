@@ -54,9 +54,9 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPut("{id}/status")]
-        public async Task<ActionResult> UpdateOrderStatus(int id, [FromBody] string status)
+        public async Task<ActionResult> UpdateOrderStatus(int id, [FromBody] UpdateOrderStatusDto dto)
         {
-            var result = await _orderService.UpdateOrderStatusAsync(id, status);
+            var result = await _orderService.UpdateOrderStatusAsync(id, dto.Status, dto.PaymentMethod);
             if (!result)
             {
                 return NotFound(new { message = "Order not found" });

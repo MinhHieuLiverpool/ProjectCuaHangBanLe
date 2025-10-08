@@ -1,5 +1,10 @@
 import apiClient from "./api";
-import { CreateOrderDto, OrderResponse, PaymentDto } from "@/types";
+import {
+  CreateOrderDto,
+  OrderResponse,
+  PaymentDto,
+  UpdateOrderStatusDto,
+} from "@/types";
 
 export const orderService = {
   async getAll(): Promise<OrderResponse[]> {
@@ -17,10 +22,13 @@ export const orderService = {
     return response.data;
   },
 
-  async updateStatus(id: number, status: string): Promise<void> {
-    await apiClient.put(`/orders/${id}/status`, JSON.stringify(status), {
-      headers: { "Content-Type": "application/json" },
-    });
+  async updateStatus(
+    id: number,
+    status: string,
+    paymentMethod?: string
+  ): Promise<void> {
+    const payload: UpdateOrderStatusDto = { status, paymentMethod };
+    await apiClient.put(`/orders/${id}/status`, payload);
   },
 
   async processPayment(data: PaymentDto): Promise<void> {

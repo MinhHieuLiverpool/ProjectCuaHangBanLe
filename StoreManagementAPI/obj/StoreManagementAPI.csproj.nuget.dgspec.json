@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Downloads\\project_cuahangbanle\\StoreManagementAPI\\StoreManagementAPI.csproj": {}
+    "C:\\Users\\ASUS Vivobook\\Desktop\\ProjectCuaHangBanLe\\StoreManagementAPI\\StoreManagementAPI.csproj": {}
   },
   "projects": {
-    "D:\\Downloads\\project_cuahangbanle\\StoreManagementAPI\\StoreManagementAPI.csproj": {
+    "C:\\Users\\ASUS Vivobook\\Desktop\\ProjectCuaHangBanLe\\StoreManagementAPI\\StoreManagementAPI.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Downloads\\project_cuahangbanle\\StoreManagementAPI\\StoreManagementAPI.csproj",
+        "projectUniqueName": "C:\\Users\\ASUS Vivobook\\Desktop\\ProjectCuaHangBanLe\\StoreManagementAPI\\StoreManagementAPI.csproj",
         "projectName": "StoreManagementAPI",
-        "projectPath": "D:\\Downloads\\project_cuahangbanle\\StoreManagementAPI\\StoreManagementAPI.csproj",
+        "projectPath": "C:\\Users\\ASUS Vivobook\\Desktop\\ProjectCuaHangBanLe\\StoreManagementAPI\\StoreManagementAPI.csproj",
         "packagesPath": "C:\\Users\\ASUS Vivobook\\.nuget\\packages\\",
-        "outputPath": "D:\\Downloads\\project_cuahangbanle\\StoreManagementAPI\\obj\\",
+        "outputPath": "C:\\Users\\ASUS Vivobook\\Desktop\\ProjectCuaHangBanLe\\StoreManagementAPI\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

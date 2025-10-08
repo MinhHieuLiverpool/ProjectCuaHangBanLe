@@ -38,10 +38,11 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  const totalRevenue = orders.reduce(
-    (sum, order) => sum + order.finalAmount,
-    0
-  );
+  // Chỉ tính doanh thu từ các đơn hàng đã thanh toán
+  const totalRevenue = orders
+    .filter((order) => order.status === "paid")
+    .reduce((sum, order) => sum + order.finalAmount, 0);
+
   const lowStockProducts = products.filter((p) => (p.stockQuantity || 0) < 10);
 
   const recentOrdersColumns = [
@@ -113,7 +114,7 @@ const DashboardPage: React.FC = () => {
         <Col xs={24} sm={12} lg={6}>
           <Card loading={loading}>
             <Statistic
-              title="Doanh thu"
+              title="Doanh thu (Đã thanh toán)"
               value={totalRevenue}
               prefix={<DollarOutlined />}
               suffix="đ"

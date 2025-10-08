@@ -9,6 +9,7 @@ namespace StoreManagementAPI.Services
     public interface IProductService
     {
         Task<IEnumerable<ProductDto>> GetAllProductsAsync();
+        Task<IEnumerable<ProductDto>> SearchProductsAsync(string searchTerm);
         Task<ProductDto?> GetProductByIdAsync(int id);
         Task<ProductDto> CreateProductAsync(CreateProductDto dto);
         Task<ProductDto?> UpdateProductAsync(int id, UpdateProductDto dto);
@@ -38,6 +39,41 @@ namespace StoreManagementAPI.Services
                 .Include(p => p.Category)
                 .Include(p => p.Supplier)
                 .Include(p => p.Inventory)
+                .ToListAsync();
+
+            return products.Select(p => new ProductDto
+            {
+                ProductId = p.ProductId,
+                CategoryId = p.CategoryId,
+                CategoryName = p.Category?.CategoryName,
+                SupplierId = p.SupplierId,
+                SupplierName = p.Supplier?.Name,
+                ProductName = p.ProductName,
+                Barcode = p.Barcode,
+                Price = p.Price,
+                Unit = p.Unit,
+                StockQuantity = p.Inventory?.Quantity
+            });
+        }
+
+        public async Task<IEnumerable<ProductDto>> SearchProductsAsync(string searchTerm)
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                return await GetAllProductsAsync();
+            }
+
+            searchTerm = searchTerm.ToLower().Trim();
+
+            var products = await _context.Products
+                .Include(p => p.Category)
+                .Include(p => p.Supplier)
+                .Include(p => p.Inventory)
+                .Where(p =>
+                    p.ProductName.ToLower().Contains(searchTerm) ||
+                    (p.Barcode != null && p.Barcode.ToLower().Contains(searchTerm)) ||
+                    (p.Category != null && p.Category.CategoryName.ToLower().Contains(searchTerm)) ||
+                    (p.Supplier != null && p.Supplier.Name.ToLower().Contains(searchTerm)))
                 .ToListAsync();
 
             return products.Select(p => new ProductDto

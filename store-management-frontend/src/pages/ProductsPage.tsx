@@ -1,28 +1,30 @@
-import React, { useEffect, useState } from "react";
+import { categoryService, supplierService } from "@/services/common.service";
+import { productService } from "@/services/product.service";
+import { Category, Product, Supplier } from "@/types";
+import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
 import {
-  Table,
   Button,
-  Space,
-  Modal,
   Form,
   Input,
   InputNumber,
-  Select,
   message,
+  Modal,
   Popconfirm,
+  Select,
+  Space,
+  Table,
 } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import { Product, Category, Supplier } from "@/types";
-import { productService } from "@/services/product.service";
-import { categoryService, supplierService } from "@/services/common.service";
+import React, { useEffect, useState } from "react";
 
 const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [searchText, setSearchText] = useState("");
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -38,10 +40,28 @@ const ProductsPage: React.FC = () => {
         supplierService.getAll(),
       ]);
       setProducts(productsData);
+      setFilteredProducts(productsData);
       setCategories(categoriesData);
       setSuppliers(suppliersData);
     } catch (error) {
       message.error("Không thể tải dữ liệu!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = async (value: string) => {
+    setSearchText(value);
+    setLoading(true);
+    try {
+      if (value.trim() === "") {
+        setFilteredProducts(products);
+      } else {
+        const results = await productService.search(value);
+        setFilteredProducts(results);
+      }
+    } catch (error) {
+      message.error("Lỗi khi tìm kiếm!");
     } finally {
       setLoading(false);
     }
@@ -80,6 +100,7 @@ const ProductsPage: React.FC = () => {
         message.success("Thêm sản phẩm thành công!");
       }
       setModalVisible(false);
+      setSearchText("");
       fetchData();
     } catch (error) {
       message.error("Lưu sản phẩm thất bại!");
@@ -164,9 +185,27 @@ const ProductsPage: React.FC = () => {
         </Button>
       </div>
 
+      <div style={{ marginBottom: 16 }}>
+        <Input.Search
+          placeholder="Tìm kiếm theo tên, mã vạch, danh mục hoặc nhà cung cấp..."
+          allowClear
+          enterButton={<><SearchOutlined /> Tìm kiếm</>}
+          size="large"
+          onSearch={handleSearch}
+          onChange={(e) => {
+            setSearchText(e.target.value);
+            if (e.target.value === "") {
+              handleSearch("");
+            }
+          }}
+          value={searchText}
+          style={{ maxWidth: 600 }}
+        />
+      </div>
+
       <Table
         columns={columns}
-        dataSource={products}
+        dataSource={filteredProducts}
         rowKey="productId"
         loading={loading}
         pagination={{ pageSize: 10 }}

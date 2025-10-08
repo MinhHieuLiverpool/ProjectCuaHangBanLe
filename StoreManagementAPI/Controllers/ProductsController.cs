@@ -25,6 +25,14 @@ namespace StoreManagementAPI.Controllers
             return Ok(products);
         }
 
+        [HttpGet("search")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<ProductDto>>> SearchProducts([FromQuery] string searchTerm)
+        {
+            var products = await _productService.SearchProductsAsync(searchTerm);
+            return Ok(products);
+        }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<ProductDto>> GetProduct(int id)
         {

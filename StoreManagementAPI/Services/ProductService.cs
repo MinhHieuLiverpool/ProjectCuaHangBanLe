@@ -52,6 +52,7 @@ namespace StoreManagementAPI.Services
                 Barcode = p.Barcode,
                 Price = p.Price,
                 Unit = p.Unit,
+                Status = p.Status,
                 StockQuantity = p.Inventory?.Quantity
             });
         }
@@ -87,6 +88,7 @@ namespace StoreManagementAPI.Services
                 Barcode = p.Barcode,
                 Price = p.Price,
                 Unit = p.Unit,
+                Status = p.Status,
                 StockQuantity = p.Inventory?.Quantity
             });
         }
@@ -112,6 +114,7 @@ namespace StoreManagementAPI.Services
                 Barcode = product.Barcode,
                 Price = product.Price,
                 Unit = product.Unit,
+                Status = product.Status,
                 StockQuantity = product.Inventory?.Quantity
             };
         }
@@ -152,6 +155,7 @@ namespace StoreManagementAPI.Services
             if (dto.Barcode != null) product.Barcode = dto.Barcode;
             if (dto.Price.HasValue) product.Price = dto.Price.Value;
             if (!string.IsNullOrEmpty(dto.Unit)) product.Unit = dto.Unit;
+            if (!string.IsNullOrEmpty(dto.Status)) product.Status = dto.Status;
 
             await _productRepository.UpdateAsync(product);
             return await GetProductByIdAsync(id);
@@ -159,6 +163,22 @@ namespace StoreManagementAPI.Services
 
         public async Task<bool> DeleteProductAsync(int id)
         {
+            var product = await _context.Products
+                .Include(p => p.OrderItems)
+                .FirstOrDefaultAsync(p => p.ProductId == id);
+
+            if (product == null) return false;
+
+            // ktra bán chưa
+            if (product.OrderItems != null && product.OrderItems.Any())
+            {
+                // đã bán => soft delete
+                product.Status = "inactive";
+                await _productRepository.UpdateAsync(product);
+                return true;
+            }
+
+            // chua bán => xóa real
             return await _productRepository.DeleteAsync(id);
         }
 

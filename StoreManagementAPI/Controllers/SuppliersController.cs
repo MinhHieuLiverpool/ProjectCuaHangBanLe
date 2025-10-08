@@ -7,7 +7,7 @@ namespace StoreManagementAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "admin")]
+    [Authorize] // Yêu cầu đăng nhập, nhưng không giới hạn role
     public class SuppliersController : ControllerBase
     {
         private readonly IRepository<Supplier> _supplierRepository;
@@ -18,6 +18,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpGet]
+        // Staff và Admin đều có thể đọc danh sách nhà cung cấp
         public async Task<ActionResult<IEnumerable<Supplier>>> GetAll()
         {
             var suppliers = await _supplierRepository.GetAllAsync();
@@ -25,6 +26,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpGet("{id}")]
+        // Staff và Admin đều có thể đọc chi tiết nhà cung cấp
         public async Task<ActionResult<Supplier>> GetById(int id)
         {
             var supplier = await _supplierRepository.GetByIdAsync(id);
@@ -33,6 +35,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "admin")] // Chỉ admin mới được tạo mới
         public async Task<ActionResult<Supplier>> Create([FromBody] Supplier supplier)
         {
             var created = await _supplierRepository.AddAsync(supplier);
@@ -40,6 +43,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "admin")] // Chỉ admin mới được cập nhật
         public async Task<ActionResult<Supplier>> Update(int id, [FromBody] Supplier supplier)
         {
             var existing = await _supplierRepository.GetByIdAsync(id);
@@ -55,6 +59,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "admin")] // Chỉ admin mới được xóa
         public async Task<ActionResult> Delete(int id)
         {
             var result = await _supplierRepository.DeleteAsync(id);

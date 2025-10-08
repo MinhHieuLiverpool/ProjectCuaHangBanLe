@@ -33,6 +33,10 @@ namespace StoreManagementAPI.Models
         [StringLength(20)]
         public string Unit { get; set; } = "pcs";
 
+        [Column("status")]
+        [StringLength(20)]
+        public string Status { get; set; } = "active"; // active, inactive
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 

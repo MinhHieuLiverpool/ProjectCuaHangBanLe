@@ -27,6 +27,7 @@ export interface Product {
   barcode?: string;
   price: number;
   unit: string;
+  status: string; // active || inactive
   stockQuantity?: number;
 }
 

@@ -13,6 +13,7 @@ import {
   Select,
   Space,
   Table,
+  Tag,
 } from "antd";
 import React, { useEffect, useState } from "react";
 
@@ -89,6 +90,20 @@ const ProductsPage: React.FC = () => {
     }
   };
 
+  const handleToggleStatus = async (productId: number, newStatus: string) => {
+    try {
+      await productService.update(productId, { status: newStatus });
+      message.success(
+        newStatus === "active"
+          ? "Hiển thị sản phẩm thành công!"
+          : "Ẩn sản phẩm thành công!"
+      );
+      fetchData();
+    } catch (error) {
+      message.error("Cập nhật trạng thái thất bại!");
+    }
+  };
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -123,11 +138,19 @@ const ProductsPage: React.FC = () => {
       title: "Danh mục",
       dataIndex: "categoryName",
       key: "categoryName",
+      width: 120,
+    },
+    {
+      title: "Nhà cung cấp",
+      dataIndex: "supplierName",
+      key: "supplierName",
+      width: 150,
     },
     {
       title: "Giá",
       dataIndex: "price",
       key: "price",
+      width: 120,
       render: (price: number) =>
         price ? `${price.toLocaleString("vi-VN")}đ` : "0đ",
     },
@@ -135,33 +158,73 @@ const ProductsPage: React.FC = () => {
       title: "Đơn vị",
       dataIndex: "unit",
       key: "unit",
+      width: 80,
     },
     {
       title: "Tồn kho",
       dataIndex: "stockQuantity",
       key: "stockQuantity",
+      width: 90,
       render: (stock: number) => (
         <span style={{ color: stock < 10 ? "red" : "inherit" }}>{stock}</span>
       ),
     },
     {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      width: 100,
+      render: (status: string) => (
+        <Tag color={status === "active" ? "green" : "red"}>
+          {status === "active" ? "Đang bán" : "Ngừng bán"}
+        </Tag>
+      ),
+    },
+    {
       title: "Thao tác",
       key: "action",
-      width: 150,
+      width: 200,
       render: (_: any, record: Product) => (
-        <Space>
+        <Space size="small">
           <Button
             type="link"
+            size="small"
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
           >
             Sửa
           </Button>
+          {record.status === "active" ? (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleToggleStatus(record.productId, "inactive")}
+              style={{ color: "orange" }}
+            >
+              Ẩn
+            </Button>
+          ) : (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleToggleStatus(record.productId, "active")}
+              style={{ color: "green" }}
+            >
+              Hiện
+            </Button>
+          )}
           <Popconfirm
-            title="Bạn có chắc muốn xóa?"
+            title={
+              <div>
+                <div>Bạn có chắc muốn xóa?</div>
+                <div style={{ fontSize: "12px", color: "#666", marginTop: 4 }}>
+                  * Sản phẩm đã bán sẽ được ẩn thay vì xóa
+                </div>
+              </div>
+            }
             onConfirm={() => handleDelete(record.productId)}
           >
-            <Button type="link" danger icon={<DeleteOutlined />}>
+            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
               Xóa
             </Button>
           </Popconfirm>
@@ -219,6 +282,12 @@ const ProductsPage: React.FC = () => {
         width={600}
       >
         <Form form={form} layout="vertical">
+          {editingProduct && (
+            <Form.Item label="Mã sản phẩm">
+              <Input value={editingProduct.productId} disabled />
+            </Form.Item>
+          )}
+
           <Form.Item
             name="productName"
             label="Tên sản phẩm"
@@ -261,11 +330,22 @@ const ProductsPage: React.FC = () => {
 
           <Form.Item
             name="price"
-            label="Giá"
+            label="Giá (đ)"
             rules={[{ required: true, message: "Vui lòng nhập giá!" }]}
           >
-            <InputNumber min={0} style={{ width: "100%" }} />
+            <InputNumber
+              min={0}
+              style={{ width: "100%" }}
+              disabled={!!editingProduct}
+              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+            />
           </Form.Item>
+
+          {editingProduct && (
+            <div style={{ marginBottom: 16, color: "#ff4d4f", fontSize: "12px" }}>
+              * Giá không thể sửa đổi khi cập nhật sản phẩm
+            </div>
+          )}
 
           <Form.Item
             name="unit"

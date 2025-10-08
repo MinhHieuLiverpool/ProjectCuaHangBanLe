@@ -96,7 +96,7 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
             >
               <Select placeholder="Chọn trạng thái">
                 <Select.Option value="active">Đang áp dụng</Select.Option>
-                <Select.Option value="inactive">Ngừng</Select.Option>
+                <Select.Option value="inactive">Hết hạn</Select.Option>
               </Select>
             </Form.Item>
           </Col>

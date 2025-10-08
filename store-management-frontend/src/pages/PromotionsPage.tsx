@@ -69,38 +69,24 @@ const PromotionsPage: React.FC = () => {
   const getPromotionStatusDisplay = (promotion: Promotion) => {
     const now = new Date();
     const endDate = new Date(promotion.endDate);
-    const startDate = new Date(promotion.startDate);
     
-    // Hiển thị theo status từ database
+    // Chỉ có 2 trạng thái: Đang áp dụng và Hết hạn
     if (promotion.status === "active") {
       return { 
         text: "Đang áp dụng", 
         color: "green",
         tooltip: "Khuyến mãi đang hoạt động"
       };
+    } else {
+      // Inactive = Hết hạn (bao gồm cả hết lượt hoặc chưa bắt đầu)
+      return { 
+        text: "Hết hạn", 
+        color: "red",
+        tooltip: now > endDate 
+          ? `Đã quá ngày kết thúc: ${endDate.toLocaleDateString("vi-VN")}`
+          : "Khuyến mãi đã ngừng hoạt động"
+      };
     }
-    
-    // Nếu inactive, kiểm tra lý do để hiển thị tooltip
-    let tooltip = "Khuyến mãi đã ngừng";
-    let text = "Ngừng";
-    let color = "default";
-    
-    // Kiểm tra lý do inactive
-    if (now > endDate) {
-      tooltip = `Đã hết hạn từ ${endDate.toLocaleDateString("vi-VN")}`;
-      text = "Hết hạn";
-      color = "red";
-    } else if (now < startDate) {
-      tooltip = `Chưa đến ngày bắt đầu: ${startDate.toLocaleDateString("vi-VN")}`;
-      text = "Chưa bắt đầu";
-      color = "orange";
-    } else if (promotion.usedCount >= promotion.usageLimit && promotion.usageLimit > 0) {
-      tooltip = `Đã hết lượt sử dụng (${promotion.usedCount}/${promotion.usageLimit})`;
-      text = "Hết lượt";
-      color = "volcano";
-    }
-    
-    return { text, color, tooltip };
   };
 
   const columns = [

@@ -68,9 +68,19 @@ const PromotionsPage: React.FC = () => {
   // Hàm lấy thông tin hiển thị trạng thái từ database
   const getPromotionStatusDisplay = (promotion: Promotion) => {
     const now = new Date();
+    const startDate = new Date(promotion.startDate);
     const endDate = new Date(promotion.endDate);
     
-    // Chỉ có 2 trạng thái: Đang áp dụng và Hết hạn
+    // Kiểm tra chưa bắt đầu
+    if (now < startDate) {
+      return { 
+        text: "Chưa bắt đầu", 
+        color: "orange",
+        tooltip: `Sẽ bắt đầu từ ${startDate.toLocaleDateString("vi-VN")}`
+      };
+    }
+    
+    // Đang áp dụng
     if (promotion.status === "active") {
       return { 
         text: "Đang áp dụng", 
@@ -78,7 +88,7 @@ const PromotionsPage: React.FC = () => {
         tooltip: "Khuyến mãi đang hoạt động"
       };
     } else {
-      // Inactive = Hết hạn (bao gồm cả hết lượt hoặc chưa bắt đầu)
+      // Inactive = Hết hạn
       return { 
         text: "Hết hạn", 
         color: "red",
@@ -193,11 +203,20 @@ const PromotionsPage: React.FC = () => {
       align: "center" as const,
       render: (_: any, record: Promotion) => {
         const statusInfo = getPromotionStatusDisplay(record);
+        const colorMap: any = {
+          green: "#52c41a",
+          orange: "#faad14",
+          red: "#ff4d4f"
+        };
         return (
           <Tooltip title={statusInfo.tooltip}>
-            <Tag color={statusInfo.color} style={{ fontSize: "12px" }}>
+            <span style={{ 
+              fontSize: "12px", 
+              fontWeight: 600,
+              color: colorMap[statusInfo.color] || statusInfo.color
+            }}>
               {statusInfo.text}
-            </Tag>
+            </span>
           </Tooltip>
         );
       },

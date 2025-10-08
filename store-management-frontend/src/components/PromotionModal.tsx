@@ -66,6 +66,27 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
     }
   };
 
+  // Validator cho ngày kết thúc khi sửa
+  const validateEndDate = (_: any, value: any) => {
+    if (!value) {
+      return Promise.reject(new Error("Vui lòng chọn ngày!"));
+    }
+
+    // Nếu đang sửa, kiểm tra ngày kết thúc mới phải >= ngày kết thúc cũ
+    if (editingPromotion) {
+      const oldEndDate = dayjs(editingPromotion.endDate).startOf('day');
+      const newEndDate = value.startOf('day');
+      
+      if (newEndDate.isBefore(oldEndDate)) {
+        return Promise.reject(
+          new Error(`Ngày kết thúc mới không được trước ngày ${oldEndDate.format("DD/MM/YYYY")}`)
+        );
+      }
+    }
+
+    return Promise.resolve();
+  };
+
   return (
     <Modal
       title={editingPromotion ? "Cập nhật khuyến mãi" : "Thêm khuyến mãi"}
@@ -85,7 +106,10 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
               label="Mã khuyến mãi"
               rules={[{ required: true, message: "Vui lòng nhập mã!" }]}
             >
-              <Input placeholder="Nhập mã khuyến mãi" />
+              <Input 
+                placeholder="Nhập mã khuyến mãi" 
+                disabled={!!editingPromotion}
+              />
             </Form.Item>
           </Col>
           <Col span={12}>
@@ -166,6 +190,7 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
                 min={1}
                 style={{ width: "100%" }}
                 placeholder="Nhập số lần sử dụng tối đa"
+                disabled={!!editingPromotion}
               />
             </Form.Item>
           </Col>
@@ -183,6 +208,7 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
                 style={{ width: "100%" }}
                 format="DD/MM/YYYY"
                 placeholder="Chọn ngày bắt đầu"
+                disabled={!!editingPromotion}
               />
             </Form.Item>
           </Col>
@@ -190,7 +216,11 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
             <Form.Item
               name="endDate"
               label="Ngày kết thúc"
-              rules={[{ required: true, message: "Vui lòng chọn ngày!" }]}
+              rules={[
+                { required: true, message: "Vui lòng chọn ngày!" },
+                { validator: validateEndDate }
+              ]}
+              validateTrigger={['onChange', 'onBlur']}
             >
               <DatePicker
                 style={{ width: "100%" }}

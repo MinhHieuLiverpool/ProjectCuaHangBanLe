@@ -3,20 +3,15 @@ import {
   Table,
   Button,
   Space,
-  Modal,
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  DatePicker,
   message,
   Popconfirm,
   Tag,
+  Tooltip,
 } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Promotion } from "@/types";
 import { promotionService } from "@/services/common.service";
-import dayjs from "dayjs";
+import PromotionModal from "@/components/Promotions/PromotionModal";
 
 const PromotionsPage: React.FC = () => {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -25,7 +20,6 @@ const PromotionsPage: React.FC = () => {
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(
     null
   );
-  const [form] = Form.useForm();
 
   useEffect(() => {
     fetchData();
@@ -45,17 +39,11 @@ const PromotionsPage: React.FC = () => {
 
   const handleCreate = () => {
     setEditingPromotion(null);
-    form.resetFields();
     setModalVisible(true);
   };
 
   const handleEdit = (promotion: Promotion) => {
     setEditingPromotion(promotion);
-    form.setFieldsValue({
-      ...promotion,
-      startDate: dayjs(promotion.startDate),
-      endDate: dayjs(promotion.endDate),
-    });
     setModalVisible(true);
   };
 
@@ -69,27 +57,50 @@ const PromotionsPage: React.FC = () => {
     }
   };
 
-  const handleSubmit = async () => {
-    try {
-      const values = await form.validateFields();
-      const data = {
-        ...values,
-        startDate: values.startDate.format("YYYY-MM-DD"),
-        endDate: values.endDate.format("YYYY-MM-DD"),
-      };
+  const handleModalClose = () => {
+    setModalVisible(false);
+  };
 
-      if (editingPromotion) {
-        await promotionService.update(editingPromotion.promoId, data);
-        message.success("Cập nhật khuyến mãi thành công!");
-      } else {
-        await promotionService.create(data);
-        message.success("Thêm khuyến mãi thành công!");
-      }
-      setModalVisible(false);
-      fetchData();
-    } catch (error) {
-      message.error("Lưu khuyến mãi thất bại!");
+  const handleModalSuccess = () => {
+    fetchData();
+  };
+
+  // Hàm lấy thông tin hiển thị trạng thái từ database
+  const getPromotionStatusDisplay = (promotion: Promotion) => {
+    const now = new Date();
+    const endDate = new Date(promotion.endDate);
+    const startDate = new Date(promotion.startDate);
+    
+    // Hiển thị theo status từ database
+    if (promotion.status === "active") {
+      return { 
+        text: "Đang áp dụng", 
+        color: "green",
+        tooltip: "Khuyến mãi đang hoạt động"
+      };
     }
+    
+    // Nếu inactive, kiểm tra lý do để hiển thị tooltip
+    let tooltip = "Khuyến mãi đã ngừng";
+    let text = "Ngừng";
+    let color = "default";
+    
+    // Kiểm tra lý do inactive
+    if (now > endDate) {
+      tooltip = `Đã hết hạn từ ${endDate.toLocaleDateString("vi-VN")}`;
+      text = "Hết hạn";
+      color = "red";
+    } else if (now < startDate) {
+      tooltip = `Chưa đến ngày bắt đầu: ${startDate.toLocaleDateString("vi-VN")}`;
+      text = "Chưa bắt đầu";
+      color = "orange";
+    } else if (promotion.usedCount >= promotion.usageLimit && promotion.usageLimit > 0) {
+      tooltip = `Đã hết lượt sử dụng (${promotion.usedCount}/${promotion.usageLimit})`;
+      text = "Hết lượt";
+      color = "volcano";
+    }
+    
+    return { text, color, tooltip };
   };
 
   const columns = [
@@ -97,60 +108,126 @@ const PromotionsPage: React.FC = () => {
       title: "Mã KM",
       dataIndex: "promoCode",
       key: "promoCode",
-      width: 120,
+      width: 100,
+      align: "center" as const,
+      render: (text: string) => <span style={{ fontSize: "13px" }}>{text}</span>,
     },
     {
       title: "Mô tả",
       dataIndex: "description",
       key: "description",
+      ellipsis: true,
+      width: 200,
+      align: "center" as const,
+      render: (text: string) => <span style={{ fontSize: "13px" }}>{text}</span>,
     },
     {
       title: "Loại giảm",
       dataIndex: "discountType",
       key: "discountType",
-      render: (type: string) => (type === "percent" ? "Phần trăm" : "Cố định"),
+      width: 100,
+      align: "center" as const,
+      render: (type: string) => (
+        <span style={{ fontSize: "13px" }}>
+          {type === "percent" ? "Phần trăm" : "Cố định"}
+        </span>
+      ),
     },
     {
       title: "Giá trị",
       dataIndex: "discountValue",
       key: "discountValue",
-      render: (value: number, record: Promotion) =>
-        record.discountType === "percent"
-          ? `${value}%`
-          : `${value.toLocaleString("vi-VN")}đ`,
+      width: 100,
+      align: "center" as const,
+      render: (value: number, record: Promotion) => (
+        <span style={{ fontSize: "13px" }}>
+          {record.discountType === "percent"
+            ? `${value}%`
+            : `${value.toLocaleString("vi-VN")}đ`}
+        </span>
+      ),
     },
     {
       title: "Đơn tối thiểu",
       dataIndex: "minOrderAmount",
       key: "minOrderAmount",
-      render: (amount: number) => `${amount.toLocaleString("vi-VN")}đ`,
+      width: 120,
+      align: "center" as const,
+      render: (amount: number) => (
+        <span style={{ fontSize: "13px" }}>{amount.toLocaleString("vi-VN")}đ</span>
+      ),
+    },
+    {
+      title: "Thời gian",
+      key: "period",
+      width: 110,
+      align: "center" as const,
+      render: (_: any, record: Promotion) => {
+        const start = new Date(record.startDate).toLocaleDateString("vi-VN");
+        const end = new Date(record.endDate).toLocaleDateString("vi-VN");
+        return (
+          <div style={{ fontSize: "11px", lineHeight: "1.4" }}>
+            <div style={{ color: "#52c41a", fontWeight: 500 }}>{start}</div>
+            <div style={{ color: "#ff4d4f", fontWeight: 500 }}>{end}</div>
+          </div>
+        );
+      },
     },
     {
       title: "Đã dùng/Giới hạn",
       key: "usage",
-      render: (_: any, record: Promotion) =>
-        `${record.usedCount}/${record.usageLimit}`,
+      width: 110,
+      align: "center" as const,
+      render: (_: any, record: Promotion) => {
+        const percentage = record.usageLimit > 0 
+          ? Math.round((record.usedCount / record.usageLimit) * 100)
+          : 0;
+        const isFull = record.usedCount >= record.usageLimit && record.usageLimit > 0;
+        
+        return (
+          <div style={{ fontSize: "12px" }}>
+            <div style={{ fontWeight: 500 }}>{`${record.usedCount}/${record.usageLimit}`}</div>
+            {record.usageLimit > 0 && (
+              <div style={{ 
+                fontSize: "10px", 
+                color: isFull ? "#ff4d4f" : percentage > 80 ? "#faad14" : "#52c41a",
+                fontWeight: 500
+              }}>
+                {percentage}%
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: "Trạng thái",
-      dataIndex: "status",
       key: "status",
-      render: (status: string) => (
-        <Tag color={status === "active" ? "green" : "red"}>
-          {status === "active" ? "Đang áp dụng" : "Ngừng"}
-        </Tag>
-      ),
+      width: 130,
+      align: "center" as const,
+      render: (_: any, record: Promotion) => {
+        const statusInfo = getPromotionStatusDisplay(record);
+        return (
+          <Tooltip title={statusInfo.tooltip}>
+            <Tag color={statusInfo.color} style={{ fontSize: "12px" }}>
+              {statusInfo.text}
+            </Tag>
+          </Tooltip>
+        );
+      },
     },
     {
       title: "Thao tác",
       key: "action",
       width: 150,
+      align: "center" as const,
       render: (_: any, record: Promotion) => (
         <Space>
           <Button
             type="link"
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
+            style={{ fontSize: "13px" }}
           >
             Sửa
           </Button>
@@ -158,7 +235,12 @@ const PromotionsPage: React.FC = () => {
             title="Bạn có chắc muốn xóa?"
             onConfirm={() => handleDelete(record.promoId)}
           >
-            <Button type="link" danger icon={<DeleteOutlined />}>
+            <Button 
+              type="link" 
+              danger 
+              icon={<DeleteOutlined />}
+              style={{ fontSize: "13px" }}
+            >
               Xóa
             </Button>
           </Popconfirm>
@@ -190,89 +272,12 @@ const PromotionsPage: React.FC = () => {
         pagination={{ pageSize: 10 }}
       />
 
-      <Modal
-        title={editingPromotion ? "Cập nhật khuyến mãi" : "Thêm khuyến mãi"}
-        open={modalVisible}
-        onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
-        width={700}
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item
-            name="promoCode"
-            label="Mã khuyến mãi"
-            rules={[{ required: true, message: "Vui lòng nhập mã!" }]}
-          >
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="description" label="Mô tả">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-
-          <Form.Item
-            name="discountType"
-            label="Loại giảm giá"
-            rules={[{ required: true, message: "Vui lòng chọn loại!" }]}
-          >
-            <Select>
-              <Select.Option value="percent">Phần trăm (%)</Select.Option>
-              <Select.Option value="fixed">Cố định (đ)</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="discountValue"
-            label="Giá trị giảm"
-            rules={[{ required: true, message: "Vui lòng nhập giá trị!" }]}
-          >
-            <InputNumber min={0} style={{ width: "100%" }} />
-          </Form.Item>
-
-          <Form.Item
-            name="minOrderAmount"
-            label="Đơn hàng tối thiểu"
-            rules={[{ required: true, message: "Vui lòng nhập giá trị!" }]}
-          >
-            <InputNumber min={0} style={{ width: "100%" }} />
-          </Form.Item>
-
-          <Form.Item
-            name="usageLimit"
-            label="Giới hạn sử dụng"
-            rules={[{ required: true, message: "Vui lòng nhập giá trị!" }]}
-          >
-            <InputNumber min={1} style={{ width: "100%" }} />
-          </Form.Item>
-
-          <Form.Item
-            name="startDate"
-            label="Ngày bắt đầu"
-            rules={[{ required: true, message: "Vui lòng chọn ngày!" }]}
-          >
-            <DatePicker style={{ width: "100%" }} />
-          </Form.Item>
-
-          <Form.Item
-            name="endDate"
-            label="Ngày kết thúc"
-            rules={[{ required: true, message: "Vui lòng chọn ngày!" }]}
-          >
-            <DatePicker style={{ width: "100%" }} />
-          </Form.Item>
-
-          <Form.Item
-            name="status"
-            label="Trạng thái"
-            rules={[{ required: true, message: "Vui lòng chọn trạng thái!" }]}
-          >
-            <Select>
-              <Select.Option value="active">Đang áp dụng</Select.Option>
-              <Select.Option value="inactive">Ngừng</Select.Option>
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
+      <PromotionModal
+        visible={modalVisible}
+        editingPromotion={editingPromotion}
+        onClose={handleModalClose}
+        onSuccess={handleModalSuccess}
+      />
     </div>
   );
 };

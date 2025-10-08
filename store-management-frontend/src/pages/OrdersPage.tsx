@@ -5,7 +5,6 @@ import {
   Modal,
   Form,
   Select,
-  InputNumber,
   message,
   Card,
   Row,
@@ -15,12 +14,11 @@ import {
   Tag,
   DatePicker,
   Space,
+  InputNumber,
 } from "antd";
 import {
   PlusOutlined,
-  DeleteOutlined,
   EyeOutlined,
-  UserAddOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   SearchOutlined,
@@ -32,14 +30,7 @@ import { orderService } from "@/services/order.service";
 import { customerService, promotionService } from "@/services/common.service";
 import { productService } from "@/services/product.service";
 import { useAuth } from "@/context/AuthContext";
-
-interface OrderItem {
-  productId: number;
-  productName?: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-}
+import CreateOrderModal from "@/components/Orders/CreateOrderModal";
 
 const OrdersPage: React.FC = () => {
   const { user } = useAuth();
@@ -55,10 +46,8 @@ const OrdersPage: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<OrderResponse | null>(
     null
   );
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<string>("cash");
-  const [form] = Form.useForm();
   const [customerForm] = Form.useForm();
 
   // Filter states
@@ -95,109 +84,7 @@ const OrdersPage: React.FC = () => {
   };
 
   const handleCreate = () => {
-    form.resetFields();
-    setOrderItems([]);
     setModalVisible(true);
-  };
-
-  const handleAddItem = () => {
-    const productId = form.getFieldValue("productId");
-    const quantity = form.getFieldValue("quantity") || 1;
-
-    if (!productId) {
-      message.warning("Vui lòng chọn sản phẩm!");
-      return;
-    }
-
-    const product = products.find((p) => p.productId === productId);
-    if (!product) return;
-
-    // Kiểm tra tồn kho
-    if (!product.stockQuantity || product.stockQuantity === 0) {
-      message.error(`Sản phẩm "${product.productName}" đã hết hàng!`);
-      return;
-    }
-
-    const existingItemIndex = orderItems.findIndex(
-      (item) => item.productId === productId
-    );
-
-    // Tính tổng số lượng sẽ thêm
-    const currentQuantityInCart =
-      existingItemIndex >= 0 ? orderItems[existingItemIndex].quantity : 0;
-    const totalQuantity = currentQuantityInCart + quantity;
-
-    // Kiểm tra xem tổng số lượng có vượt quá tồn kho không
-    if (totalQuantity > product.stockQuantity) {
-      message.error(
-        `Không đủ hàng! Sản phẩm "${product.productName}" chỉ còn ${product.stockQuantity} ${product.unit} trong kho (Bạn đã thêm ${currentQuantityInCart} ${product.unit})`
-      );
-      return;
-    }
-
-    if (existingItemIndex >= 0) {
-      const newItems = [...orderItems];
-      newItems[existingItemIndex].quantity += quantity;
-      newItems[existingItemIndex].totalPrice =
-        newItems[existingItemIndex].quantity * product.price;
-      setOrderItems(newItems);
-      message.success(`Đã cập nhật số lượng "${product.productName}"`);
-    } else {
-      setOrderItems([
-        ...orderItems,
-        {
-          productId: product.productId,
-          productName: product.productName,
-          quantity,
-          unitPrice: product.price,
-          totalPrice: product.price * quantity,
-        },
-      ]);
-      message.success(`Đã thêm "${product.productName}" vào đơn hàng`);
-    }
-
-    form.setFieldsValue({ productId: undefined, quantity: 1 });
-  };
-
-  const handleRemoveItem = (productId: number) => {
-    setOrderItems(orderItems.filter((item) => item.productId !== productId));
-  };
-
-  const calculateTotal = () => {
-    return orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
-  };
-
-  const handleSubmit = async () => {
-    try {
-      if (!user || !user.userId) {
-        message.error("Vui lòng đăng nhập lại!");
-        return;
-      }
-
-      const values = await form.validateFields(["customerId", "promotionCode"]);
-
-      if (orderItems.length === 0) {
-        message.warning("Vui lòng thêm ít nhất 1 sản phẩm!");
-        return;
-      }
-
-      const orderData = {
-        customerId: values.customerId,
-        userId: user.userId,
-        promoCode: values.promotionCode,
-        items: orderItems.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-        })),
-      };
-
-      await orderService.create(orderData);
-      message.success("Tạo đơn hàng thành công!");
-      setModalVisible(false);
-      fetchData();
-    } catch (error) {
-      message.error("Tạo đơn hàng thất bại!");
-    }
   };
 
   const handleViewDetail = async (order: OrderResponse) => {
@@ -218,16 +105,13 @@ const OrdersPage: React.FC = () => {
   const handleCustomerSubmit = async () => {
     try {
       const values = await customerForm.validateFields();
-      const newCustomer = await customerService.create(values);
+      await customerService.create(values);
       message.success("Thêm khách hàng thành công!");
       setCustomerModalVisible(false);
 
       // Reload danh sách khách hàng
       const customersData = await customerService.getAll();
       setCustomers(customersData);
-
-      // Tự động chọn khách hàng mới
-      form.setFieldsValue({ customerId: newCustomer.customerId });
     } catch (error) {
       message.error("Thêm khách hàng thất bại!");
     }
@@ -430,46 +314,6 @@ const OrdersPage: React.FC = () => {
     },
   ];
 
-  const itemColumns = [
-    {
-      title: "Sản phẩm",
-      dataIndex: "productName",
-      key: "productName",
-    },
-    {
-      title: "Số lượng",
-      dataIndex: "quantity",
-      key: "quantity",
-    },
-    {
-      title: "Đơn giá",
-      dataIndex: "unitPrice",
-      key: "unitPrice",
-      render: (price: number) => `${price.toLocaleString("vi-VN")}đ`,
-    },
-    {
-      title: "Thành tiền",
-      dataIndex: "totalPrice",
-      key: "totalPrice",
-      render: (price: number) => `${price.toLocaleString("vi-VN")}đ`,
-    },
-    {
-      title: "Thao tác",
-      key: "action",
-      width: 80,
-      render: (_: any, record: OrderItem) => (
-        <Button
-          type="link"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => handleRemoveItem(record.productId)}
-        >
-          Xóa
-        </Button>
-      ),
-    },
-  ];
-
   return (
     <div>
       <div
@@ -640,135 +484,19 @@ const OrdersPage: React.FC = () => {
         }}
       />
 
-      <Modal
-        title="Tạo đơn hàng"
-        open={modalVisible}
-        onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
-        width={800}
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item
-            name="customerId"
-            label="Khách hàng"
-            rules={[{ required: true, message: "Vui lòng chọn khách hàng!" }]}
-          >
-            <Select
-              showSearch
-              filterOption={(input, option: any) =>
-                option.children.toLowerCase().includes(input.toLowerCase())
-              }
-              popupRender={(menu) => (
-                <>
-                  {menu}
-                  <Divider style={{ margin: "8px 0" }} />
-                  <Button
-                    type="text"
-                    icon={<UserAddOutlined />}
-                    style={{ width: "100%", textAlign: "left" }}
-                    onClick={handleAddCustomer}
-                  >
-                    Thêm khách hàng mới
-                  </Button>
-                </>
-              )}
-            >
-              {customers.map((cust) => (
-                <Select.Option
-                  key={cust.customerId}
-                  value={cust.customerId}
-                  label={`${cust.name} - ${cust.phone}`}
-                >
-                  {cust.name} - {cust.phone}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="promotionCode" label="Mã khuyến mãi">
-            <Select allowClear>
-              {promotions.map((promo) => (
-                <Select.Option
-                  key={promo.promoId}
-                  value={promo.promoCode}
-                  label={`${promo.promoCode} - Giảm ${promo.discountValue}${
-                    promo.discountType === "percent" ? "%" : "đ"
-                  }`}
-                >
-                  {promo.promoCode} - Giảm {promo.discountValue}
-                  {promo.discountType === "percent" ? "%" : "đ"}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Divider>Thêm sản phẩm</Divider>
-
-          <Row gutter={16}>
-            <Col span={14}>
-              <Form.Item name="productId" label="Sản phẩm">
-                <Select
-                  showSearch
-                  filterOption={(input, option: any) =>
-                    option.children.toLowerCase().includes(input.toLowerCase())
-                  }
-                >
-                  {products.map((prod) => (
-                    <Select.Option
-                      key={prod.productId}
-                      value={prod.productId}
-                      label={`${prod.productName} - ${prod.price.toLocaleString(
-                        "vi-VN"
-                      )}đ (Còn: ${prod.stockQuantity || 0})`}
-                      disabled={!prod.stockQuantity || prod.stockQuantity === 0}
-                    >
-                      {prod.productName} - {prod.price.toLocaleString("vi-VN")}đ
-                      <span
-                        style={{
-                          color:
-                            prod.stockQuantity && prod.stockQuantity > 0
-                              ? "#52c41a"
-                              : "#ff4d4f",
-                          marginLeft: "8px",
-                        }}
-                      >
-                        (Còn: {prod.stockQuantity || 0} {prod.unit})
-                      </span>
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item name="quantity" label="Số lượng" initialValue={1}>
-                <InputNumber min={1} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={4}>
-              <Form.Item label=" ">
-                <Button onClick={handleAddItem} block>
-                  Thêm
-                </Button>
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Table
-            dataSource={orderItems}
-            columns={itemColumns}
-            rowKey="productId"
-            pagination={false}
-            size="small"
-          />
-
-          <Card style={{ marginTop: 16 }}>
-            <h3>
-              Tổng cộng:{" "}
-              <strong>{calculateTotal().toLocaleString("vi-VN")}đ</strong>
-            </h3>
-          </Card>
-        </Form>
-      </Modal>
+      <CreateOrderModal
+        visible={modalVisible}
+        customers={customers}
+        products={products}
+        promotions={promotions}
+        userId={user?.userId || 0}
+        onClose={() => setModalVisible(false)}
+        onSuccess={() => {
+          setModalVisible(false);
+          fetchData();
+        }}
+        onAddCustomer={handleAddCustomer}
+      />
 
       <Modal
         title="Chi tiết đơn hàng"

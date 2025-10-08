@@ -11,7 +11,7 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Promotion } from "@/types";
 import { promotionService } from "@/services/common.service";
-import PromotionModal from "@/components/Promotions/PromotionModal";
+import PromotionModal from "@/components/PromotionModal";
 
 const PromotionsPage: React.FC = () => {
   const [promotions, setPromotions] = useState<Promotion[]>([]);

@@ -9,13 +9,20 @@ export const productService = {
 
   async search(searchTerm: string): Promise<Product[]> {
     const response = await apiClient.get<Product[]>(`/products/search`, {
-      params: { searchTerm }
+      params: { searchTerm },
     });
     return response.data;
   },
 
   async getById(id: number): Promise<Product> {
     const response = await apiClient.get<Product>(`/products/${id}`);
+    return response.data;
+  },
+
+  async getByBarcode(barcode: string): Promise<Product> {
+    const response = await apiClient.get<Product>(
+      `/products/barcode/${barcode}`
+    );
     return response.data;
   },
 

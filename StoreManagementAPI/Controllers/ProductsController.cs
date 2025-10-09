@@ -44,6 +44,18 @@ namespace StoreManagementAPI.Controllers
             return Ok(product);
         }
 
+        [HttpGet("barcode/{barcode}")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ProductDto>> GetProductByBarcode(string barcode)
+        {
+            var product = await _productService.GetProductByBarcodeAsync(barcode);
+            if (product == null)
+            {
+                return NotFound(new { message = "Không tìm thấy sản phẩm với mã barcode này" });
+            }
+            return Ok(product);
+        }
+
         [HttpPost]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<ProductDto>> CreateProduct([FromBody] CreateProductDto dto)

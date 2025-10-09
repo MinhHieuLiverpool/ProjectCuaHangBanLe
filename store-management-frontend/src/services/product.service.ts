@@ -1,9 +1,16 @@
+import { CreateProductDto, Product } from "@/types";
 import apiClient from "./api";
-import { Product, CreateProductDto } from "@/types";
 
 export const productService = {
   async getAll(): Promise<Product[]> {
     const response = await apiClient.get<Product[]>("/products");
+    return response.data;
+  },
+
+  async search(searchTerm: string): Promise<Product[]> {
+    const response = await apiClient.get<Product[]>(`/products/search`, {
+      params: { searchTerm }
+    });
     return response.data;
   },
 

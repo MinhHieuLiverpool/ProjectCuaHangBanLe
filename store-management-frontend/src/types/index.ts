@@ -27,6 +27,7 @@ export interface Product {
   barcode?: string;
   price: number;
   unit: string;
+  status: string; // active || inactive
   stockQuantity?: number;
 }
 
@@ -107,6 +108,8 @@ export interface OrderResponse {
   totalAmount: number;
   discountAmount: number;
   finalAmount: number;
+  paymentMethod?: string;
+  paymentDate?: string;
   items: OrderItemResponse[];
 }
 

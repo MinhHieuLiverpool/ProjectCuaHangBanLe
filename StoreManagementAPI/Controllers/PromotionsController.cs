@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StoreManagementAPI.Models;
 using StoreManagementAPI.Repositories;
+using StoreManagementAPI.Services;
 
 namespace StoreManagementAPI.Controllers
 {
@@ -11,16 +12,23 @@ namespace StoreManagementAPI.Controllers
     public class PromotionsController : ControllerBase
     {
         private readonly IRepository<Promotion> _promotionRepository;
+        private readonly IPromotionService _promotionService;
 
-        public PromotionsController(IRepository<Promotion> promotionRepository)
+        public PromotionsController(
+            IRepository<Promotion> promotionRepository,
+            IPromotionService promotionService)
         {
             _promotionRepository = promotionRepository;
+            _promotionService = promotionService;
         }
 
         [HttpGet]
         [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<Promotion>>> GetAll()
         {
+            // Cập nhật trạng thái tất cả promotion trước khi trả về
+            await _promotionService.UpdateAllPromotionStatusesAsync();
+            
             var promotions = await _promotionRepository.GetAllAsync();
             return Ok(promotions);
         }

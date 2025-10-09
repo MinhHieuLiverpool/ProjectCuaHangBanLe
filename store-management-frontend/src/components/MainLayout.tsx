@@ -1,20 +1,21 @@
-import React, { useState } from "react";
-import { Layout, Menu, Avatar, Dropdown, theme } from "antd";
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import {
   DashboardOutlined,
-  ShoppingCartOutlined,
-  ShoppingOutlined,
-  UserOutlined,
-  TeamOutlined,
-  TagsOutlined,
   GiftOutlined,
+  InboxOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  ShoppingCartOutlined,
+  ShoppingOutlined,
+  TagsOutlined,
+  TeamOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
-import { useAuth } from "@/context/AuthContext";
 import type { MenuProps } from "antd";
+import { Avatar, Dropdown, Layout, Menu, theme } from "antd";
+import React, { useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 const { Header, Sider, Content } = Layout;
 
@@ -39,6 +40,11 @@ const MainLayout: React.FC = () => {
       label: "Sản phẩm",
     },
     {
+      key: "/stock-receipts",
+      icon: <InboxOutlined />,
+      label: "Nhập hàng",
+    },
+    {
       key: "/orders",
       icon: <ShoppingCartOutlined />,
       label: "Đơn hàng",
@@ -57,18 +63,13 @@ const MainLayout: React.FC = () => {
           },
           {
             key: "/suppliers",
-            icon: <ShoppingCartOutlined />,
+            icon: <UserOutlined />,
             label: "Nhà cung cấp",
           },
           {
             key: "/promotions",
             icon: <GiftOutlined />,
             label: "Khuyến mãi",
-          },
-          {
-            key: "/users",
-            icon: <UserOutlined />,
-            label: "Tài khoản",
           },
         ]
       : []),

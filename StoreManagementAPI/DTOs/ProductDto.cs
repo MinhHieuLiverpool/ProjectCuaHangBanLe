@@ -11,6 +11,7 @@ namespace StoreManagementAPI.DTOs
         public string? Barcode { get; set; }
         public decimal Price { get; set; }
         public string Unit { get; set; } = "pcs";
+        public string Status { get; set; } = "active";
         public int? StockQuantity { get; set; }
     }
 
@@ -33,6 +34,7 @@ namespace StoreManagementAPI.DTOs
         public string? Barcode { get; set; }
         public decimal? Price { get; set; }
         public string? Unit { get; set; }
+        public string? Status { get; set; } // Thêm Status để có thể ẩn/hiện sản phẩm
     }
 
     public class UpdateStockDto

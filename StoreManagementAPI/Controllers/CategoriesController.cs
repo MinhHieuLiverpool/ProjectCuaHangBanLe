@@ -7,7 +7,7 @@ namespace StoreManagementAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "admin")]
+    [Authorize] // Yêu cầu đăng nhập, không giới hạn role
     public class CategoriesController : ControllerBase
     {
         private readonly IRepository<Category> _categoryRepository;
@@ -18,7 +18,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpGet]
-        [AllowAnonymous]
+        // Tất cả user đều có thể đọc danh mục
         public async Task<ActionResult<IEnumerable<Category>>> GetAll()
         {
             var categories = await _categoryRepository.GetAllAsync();
@@ -26,6 +26,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpGet("{id}")]
+        // Tất cả user đều có thể đọc chi tiết danh mục
         public async Task<ActionResult<Category>> GetById(int id)
         {
             var category = await _categoryRepository.GetByIdAsync(id);
@@ -34,6 +35,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "admin")] // Chỉ admin mới được tạo mới
         public async Task<ActionResult<Category>> Create([FromBody] Category category)
         {
             var created = await _categoryRepository.AddAsync(category);
@@ -41,6 +43,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "admin")] // Chỉ admin mới được cập nhật
         public async Task<ActionResult<Category>> Update(int id, [FromBody] Category category)
         {
             var existing = await _categoryRepository.GetByIdAsync(id);
@@ -53,6 +56,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "admin")] // Chỉ admin mới được xóa
         public async Task<ActionResult> Delete(int id)
         {
             var result = await _categoryRepository.DeleteAsync(id);

@@ -17,7 +17,29 @@ export const orderService = {
     return response.data;
   },
 
-  async updateStatus(id: number, status: string): Promise<void> {
+  async updateStatus(
+    id: number,
+    status: string,
+    paymentMethod?: string
+  ): Promise<void> {
+    // Nếu status là "paid" và có paymentMethod, chỉ gọi API payment
+    // (API payment sẽ tự động cập nhật status)
+    if (status === "paid" && paymentMethod) {
+      // Lấy thông tin order để biết số tiền
+      const order = await this.getById(id);
+      await this.processPayment({
+        orderId: id,
+        amount: order.finalAmount,
+        paymentMethod: paymentMethod as
+          | "cash"
+          | "card"
+          | "bank_transfer"
+          | "e-wallet",
+      });
+      return; // Không cần gọi API updateStatus nữa
+    }
+
+    // Chỉ cập nhật status cho các trường hợp khác (canceled, pending)
     await apiClient.put(`/orders/${id}/status`, JSON.stringify(status), {
       headers: { "Content-Type": "application/json" },
     });

@@ -47,14 +47,16 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IPromotionService, PromotionService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
 
 // Configure Swagger with JWT support
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo 
-    { 
-        Title = "Store Management API", 
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Store Management API",
         Version = "v1",
         Description = "API quản lý cửa hàng bán lẻ - Hệ thống quản lý đầy đủ cho cửa hàng bán lẻ"
     });

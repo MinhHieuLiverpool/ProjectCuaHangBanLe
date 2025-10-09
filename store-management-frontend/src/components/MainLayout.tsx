@@ -57,13 +57,18 @@ const MainLayout: React.FC = () => {
           },
           {
             key: "/suppliers",
-            icon: <UserOutlined />,
+            icon: <ShoppingCartOutlined />,
             label: "Nhà cung cấp",
           },
           {
             key: "/promotions",
             icon: <GiftOutlined />,
             label: "Khuyến mãi",
+          },
+          {
+            key: "/users",
+            icon: <UserOutlined />,
+            label: "Tài khoản",
           },
         ]
       : []),

@@ -21,4 +21,16 @@ namespace StoreManagementAPI.DTOs
         public string FullName { get; set; } = string.Empty;
         public string Role { get; set; } = "staff";
     }
+    public class UpdateUserDto
+    {
+        public string? Password { get; set; }
+        public string? FullName { get; set; }
+        public string? Role { get; set; }
+    }
+
+    public class UpdatePasswordDto
+    {
+        public string Password { get; set; } = string.Empty;
+
+    }
 }

@@ -13,6 +13,10 @@ namespace StoreManagementAPI.Services
         Task<LoginResponseDto?> LoginAsync(LoginDto loginDto);
         Task<User?> RegisterAsync(RegisterDto registerDto);
         string GenerateJwtToken(User user);
+        Task<IEnumerable<User>> GetUsersAsync();
+        Task<bool> UpdateUserAsync(int id, UpdateUserDto updateDto);
+        Task<bool> DeleteUserAsync(int id);
+        Task<bool> UpdatePasswordAsync(int userId, string newPassword);
     }
 
     public class AuthService : IAuthService
@@ -88,6 +92,47 @@ namespace StoreManagementAPI.Services
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+         public async Task<IEnumerable<User>> GetUsersAsync()
+        {
+            return await _userRepository.GetAllAsync();
+        }
+
+        public async Task<bool> UpdateUserAsync(int id, UpdateUserDto updateDto)
+        {
+            var users = await _userRepository.FindAsync(u => u.UserId == id);
+            var user = users.FirstOrDefault();
+            if (user == null) return false;
+
+            if (!string.IsNullOrEmpty(updateDto.Password))
+                user.Password = updateDto.Password; 
+
+            if (!string.IsNullOrEmpty(updateDto.FullName))
+                user.FullName = updateDto.FullName;
+
+            if (!string.IsNullOrEmpty(updateDto.Role))
+                user.Role = updateDto.Role;
+
+            await _userRepository.UpdateAsync(user);
+            return true;
+        }
+
+        public async Task<bool> DeleteUserAsync(int id)
+        {
+            return await _userRepository.DeleteAsync(id);
+        }
+
+        public async Task<bool> UpdatePasswordAsync(int userId, string newPassword)
+        {
+            var users = await _userRepository.FindAsync(u => u.UserId == userId);
+            var user = users.FirstOrDefault();
+
+            if (user == null)
+                return false;
+
+            user.Password = newPassword; 
+            await _userRepository.UpdateAsync(user);
+            return true;
         }
     }
 }

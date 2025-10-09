@@ -1,1 +1,11 @@
-{"Version":1,"Hash":"YUCft65MXhR3K6eHN4aOFw7A/+Xy/ok4klvyJOsFaH0=","Source":"StoreManagementAPI","BasePath":"_content/StoreManagementAPI","Mode":"Default","ManifestType":"Build","ReferencedProjectsConfiguration":[],"DiscoveryPatterns":[],"Assets":[],"Endpoints":[]}
+{
+  "Version": 1,
+  "Hash": "JqLxfkWKIH7h1Zycj70HaZVIo9gY6usQci34X877f2I=",
+  "Source": "StoreManagementAPI",
+  "BasePath": "_content/StoreManagementAPI",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

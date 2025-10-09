@@ -15,6 +15,7 @@ import CustomersPage from "./pages/CustomersPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import PromotionsPage from "./pages/PromotionsPage";
+import UsersPage from "./pages/UsersPage";
 
 function App() {
   return (
@@ -56,6 +57,14 @@ function App() {
               element={
                 <PrivateRoute requireAdmin>
                   <PromotionsPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="users"
+              element={
+                <PrivateRoute requireAdmin>
+                  <UsersPage />
                 </PrivateRoute>
               }
             />

@@ -1,20 +1,21 @@
 import {
+  Navigate,
+  Route,
   BrowserRouter as Router,
   Routes,
-  Route,
-  Navigate,
 } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
-import PrivateRoute from "./components/PrivateRoute";
 import MainLayout from "./components/MainLayout";
-import LoginPage from "./pages/LoginPage";
-import DashboardPage from "./pages/DashboardPage";
-import ProductsPage from "./pages/ProductsPage";
-import OrdersPage from "./pages/OrdersPage";
-import CustomersPage from "./pages/CustomersPage";
+import PrivateRoute from "./components/PrivateRoute";
+import { AuthProvider } from "./context/AuthContext";
 import CategoriesPage from "./pages/CategoriesPage";
-import SuppliersPage from "./pages/SuppliersPage";
+import CustomersPage from "./pages/CustomersPage";
+import DashboardPage from "./pages/DashboardPage";
+import LoginPage from "./pages/LoginPage";
+import OrdersPage from "./pages/OrdersPage";
+import ProductsPage from "./pages/ProductsPage";
 import PromotionsPage from "./pages/PromotionsPage";
+import StockReceiptsPage from "./pages/StockReceiptsPage";
+import SuppliersPage from "./pages/SuppliersPage";
 
 function App() {
   return (
@@ -59,6 +60,7 @@ function App() {
                 </PrivateRoute>
               }
             />
+            <Route path="stock-receipts" element={<StockReceiptsPage />} />
           </Route>
         </Routes>
       </Router>

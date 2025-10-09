@@ -8,6 +8,7 @@ import {
   MenuUnfoldOutlined,
   ShoppingCartOutlined,
   ShoppingOutlined,
+  SubnodeOutlined,
   TagsOutlined,
   TeamOutlined,
   UserOutlined,
@@ -63,13 +64,18 @@ const MainLayout: React.FC = () => {
           },
           {
             key: "/suppliers",
-            icon: <UserOutlined />,
+            icon: <SubnodeOutlined />,
             label: "Nhà cung cấp",
           },
           {
             key: "/promotions",
             icon: <GiftOutlined />,
             label: "Khuyến mãi",
+          },
+          {
+            key: "/users",
+            icon: <UserOutlined />,
+            label: "Tài Khoản",
           },
         ]
       : []),

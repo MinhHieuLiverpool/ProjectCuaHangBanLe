@@ -1,6 +1,16 @@
 # 🛒 HỆ THỐNG QUẢN LÝ CỬA HÀNG BÁN LẺ
 
-Hệ thống quản lý cửa hàng bán lẻ đầy đủ với Backend ASP.NET Core Web API và Frontend React + TypeScript.
+H## ⭐ TÍNH NĂNG
+
+✅ Quản lý sản phẩm & tồn kho  
+✅ Quản lý đơn hàng & thanh toán  
+✅ **Quét Barcode 4 cách** (USB, Paste ảnh, Nhập tay, Camera) 🆕  
+✅ **Paste ảnh barcode** để tự động đọc mã (Ctrl+V) 🆕  
+✅ Tạo & in barcode tự động  
+✅ Quản lý khách hàng  
+✅ Quản lý danh mục & nhà cung cấp  
+✅ Quản lý khuyến mãi  
+✅ Dashboard & thống kê quản lý cửa hàng bán lẻ đầy đủ với Backend ASP.NET Core Web API và Frontend React + TypeScript.
 
 > **📖 [XEM HƯỚNG DẪN CHI TIẾT](./HUONG_DAN_SU_DUNG.md)**
 

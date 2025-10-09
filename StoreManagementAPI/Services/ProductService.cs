@@ -11,6 +11,7 @@ namespace StoreManagementAPI.Services
         Task<IEnumerable<ProductDto>> GetAllProductsAsync();
         Task<IEnumerable<ProductDto>> SearchProductsAsync(string searchTerm);
         Task<ProductDto?> GetProductByIdAsync(int id);
+        Task<ProductDto?> GetProductByBarcodeAsync(string barcode);
         Task<ProductDto> CreateProductAsync(CreateProductDto dto);
         Task<ProductDto?> UpdateProductAsync(int id, UpdateProductDto dto);
         Task<bool> DeleteProductAsync(int id);
@@ -119,8 +120,45 @@ namespace StoreManagementAPI.Services
             };
         }
 
+        public async Task<ProductDto?> GetProductByBarcodeAsync(string barcode)
+        {
+            if (string.IsNullOrWhiteSpace(barcode))
+            {
+                return null;
+            }
+
+            var product = await _context.Products
+                .Include(p => p.Category)
+                .Include(p => p.Supplier)
+                .Include(p => p.Inventory)
+                .FirstOrDefaultAsync(p => p.Barcode == barcode.Trim());
+
+            if (product == null) return null;
+
+            return new ProductDto
+            {
+                ProductId = product.ProductId,
+                CategoryId = product.CategoryId,
+                CategoryName = product.Category?.CategoryName,
+                SupplierId = product.SupplierId,
+                SupplierName = product.Supplier?.Name,
+                ProductName = product.ProductName,
+                Barcode = product.Barcode,
+                Price = product.Price,
+                Unit = product.Unit,
+                Status = product.Status,
+                StockQuantity = product.Inventory?.Quantity
+            };
+        }
+
         public async Task<ProductDto> CreateProductAsync(CreateProductDto dto)
         {
+            // Tự động tạo barcode nếu không có
+            if (string.IsNullOrWhiteSpace(dto.Barcode))
+            {
+                dto.Barcode = await GenerateNextBarcodeAsync();
+            }
+
             var product = new Product
             {
                 CategoryId = dto.CategoryId,
@@ -142,6 +180,37 @@ namespace StoreManagementAPI.Services
             await _inventoryRepository.AddAsync(inventory);
 
             return await GetProductByIdAsync(createdProduct.ProductId) ?? new ProductDto();
+        }
+
+        private async Task<string> GenerateNextBarcodeAsync()
+        {
+            // Lấy barcode lớn nhất hiện tại với prefix 890
+            var maxBarcode = await _context.Products
+                .Where(p => p.Barcode != null && p.Barcode.StartsWith("890") && p.Barcode.Length == 13)
+                .Select(p => p.Barcode)
+                .OrderByDescending(b => b)
+                .FirstOrDefaultAsync();
+
+            long nextNumber;
+            if (maxBarcode == null)
+            {
+                // Bắt đầu từ 8900000000001
+                nextNumber = 8900000000001;
+            }
+            else
+            {
+                // Tăng lên 1
+                if (long.TryParse(maxBarcode, out long currentNumber))
+                {
+                    nextNumber = currentNumber + 1;
+                }
+                else
+                {
+                    nextNumber = 8900000000001;
+                }
+            }
+
+            return nextNumber.ToString("D13"); // Format 13 chữ số
         }
 
         public async Task<ProductDto?> UpdateProductAsync(int id, UpdateProductDto dto)

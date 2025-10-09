@@ -108,6 +108,8 @@ export interface OrderResponse {
   totalAmount: number;
   discountAmount: number;
   finalAmount: number;
+  paymentMethod?: string;
+  paymentDate?: string;
   items: OrderItemResponse[];
 }
 

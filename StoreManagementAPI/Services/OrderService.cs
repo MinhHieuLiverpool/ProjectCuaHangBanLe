@@ -151,9 +151,12 @@ namespace StoreManagementAPI.Services
                 .Include(o => o.User)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
+                .Include(o => o.Payments)
                 .FirstOrDefaultAsync(o => o.OrderId == id);
 
             if (order == null) return null;
+
+            var payment = order.Payments.FirstOrDefault();
 
             return new OrderResponseDto
             {
@@ -167,6 +170,8 @@ namespace StoreManagementAPI.Services
                 TotalAmount = order.TotalAmount,
                 DiscountAmount = order.DiscountAmount,
                 FinalAmount = order.TotalAmount - order.DiscountAmount,
+                PaymentMethod = payment?.PaymentMethod,
+                PaymentDate = payment?.PaymentDate,
                 Items = order.OrderItems.Select(oi => new OrderItemResponseDto
                 {
                     ProductId = oi.ProductId ?? 0,
@@ -185,6 +190,7 @@ namespace StoreManagementAPI.Services
                 .Include(o => o.User)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
+                .Include(o => o.Payments)
                 .OrderByDescending(o => o.OrderDate)
                 .ToListAsync();
 
@@ -200,6 +206,8 @@ namespace StoreManagementAPI.Services
                 TotalAmount = order.TotalAmount,
                 DiscountAmount = order.DiscountAmount,
                 FinalAmount = order.TotalAmount - order.DiscountAmount,
+                PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
+                PaymentDate = order.Payments.FirstOrDefault()?.PaymentDate,
                 Items = order.OrderItems.Select(oi => new OrderItemResponseDto
                 {
                     ProductId = oi.ProductId ?? 0,

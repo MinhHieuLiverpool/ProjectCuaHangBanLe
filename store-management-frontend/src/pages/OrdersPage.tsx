@@ -155,12 +155,15 @@ const OrdersPage: React.FC = () => {
       message.success("Thanh toán thành công!");
       setPaymentModalVisible(false);
 
+      // Đợi một chút để backend cập nhật
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Reload danh sách đơn hàng trước
+      await fetchData();
+
       // Reload chi tiết đơn hàng
       const updatedOrder = await orderService.getById(selectedOrder.orderId);
       setSelectedOrder(updatedOrder);
-
-      // Reload danh sách đơn hàng
-      fetchData();
     } catch (error) {
       message.error("Thanh toán thất bại!");
     }
@@ -295,6 +298,33 @@ const OrdersPage: React.FC = () => {
           <span style={{ color: colors[status] }}>
             {labels[status] || status}
           </span>
+        );
+      },
+    },
+    {
+      title: "Thanh toán",
+      dataIndex: "paymentMethod",
+      key: "paymentMethod",
+      width: 130,
+      render: (method: string) => {
+        if (!method)
+          return <span style={{ color: "#999" }}>Chưa thanh toán</span>;
+        const labels: any = {
+          cash: "Tiền mặt",
+          card: "Thẻ",
+          bank_transfer: "Chuyển khoản",
+          "e-wallet": "Ví điện tử",
+        };
+        const colors: any = {
+          cash: "green",
+          card: "blue",
+          bank_transfer: "purple",
+          "e-wallet": "orange",
+        };
+        return (
+          <Tag color={colors[method] || "default"}>
+            {labels[method] || method}
+          </Tag>
         );
       },
     },

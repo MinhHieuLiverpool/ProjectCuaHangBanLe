@@ -1,13 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  Table,
-  Button,
-  Space,
-  message,
-  Popconfirm,
-  Tag,
-  Tooltip,
-} from "antd";
+import { Table, Button, Space, message, Popconfirm, Tooltip } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Promotion } from "@/types";
 import { promotionService } from "@/services/common.service";
@@ -70,31 +62,32 @@ const PromotionsPage: React.FC = () => {
     const now = new Date();
     const startDate = new Date(promotion.startDate);
     const endDate = new Date(promotion.endDate);
-    
+
     // Kiểm tra chưa bắt đầu
     if (now < startDate) {
-      return { 
-        text: "Chưa bắt đầu", 
+      return {
+        text: "Chưa bắt đầu",
         color: "orange",
-        tooltip: `Sẽ bắt đầu từ ${startDate.toLocaleDateString("vi-VN")}`
+        tooltip: `Sẽ bắt đầu từ ${startDate.toLocaleDateString("vi-VN")}`,
       };
     }
-    
+
     // Đang áp dụng
     if (promotion.status === "active") {
-      return { 
-        text: "Đang áp dụng", 
+      return {
+        text: "Đang áp dụng",
         color: "green",
-        tooltip: "Khuyến mãi đang hoạt động"
+        tooltip: "Khuyến mãi đang hoạt động",
       };
     } else {
       // Inactive = Hết hạn
-      return { 
-        text: "Hết hạn", 
+      return {
+        text: "Hết hạn",
         color: "red",
-        tooltip: now > endDate 
-          ? `Đã quá ngày kết thúc: ${endDate.toLocaleDateString("vi-VN")}`
-          : "Khuyến mãi đã ngừng hoạt động"
+        tooltip:
+          now > endDate
+            ? `Đã quá ngày kết thúc: ${endDate.toLocaleDateString("vi-VN")}`
+            : "Khuyến mãi đã ngừng hoạt động",
       };
     }
   };
@@ -106,7 +99,9 @@ const PromotionsPage: React.FC = () => {
       key: "promoCode",
       width: 100,
       align: "center" as const,
-      render: (text: string) => <span style={{ fontSize: "13px" }}>{text}</span>,
+      render: (text: string) => (
+        <span style={{ fontSize: "13px" }}>{text}</span>
+      ),
     },
     {
       title: "Mô tả",
@@ -115,7 +110,9 @@ const PromotionsPage: React.FC = () => {
       ellipsis: true,
       width: 200,
       align: "center" as const,
-      render: (text: string) => <span style={{ fontSize: "13px" }}>{text}</span>,
+      render: (text: string) => (
+        <span style={{ fontSize: "13px" }}>{text}</span>
+      ),
     },
     {
       title: "Loại giảm",
@@ -139,7 +136,7 @@ const PromotionsPage: React.FC = () => {
         <span style={{ fontSize: "13px" }}>
           {record.discountType === "percent"
             ? `${value}%`
-            : `${value.toLocaleString("vi-VN")}đ`}
+            : `${(value || 0).toLocaleString("vi-VN")}đ`}
         </span>
       ),
     },
@@ -150,7 +147,9 @@ const PromotionsPage: React.FC = () => {
       width: 120,
       align: "center" as const,
       render: (amount: number) => (
-        <span style={{ fontSize: "13px" }}>{amount.toLocaleString("vi-VN")}đ</span>
+        <span style={{ fontSize: "13px" }}>
+          {(amount || 0).toLocaleString("vi-VN")}đ
+        </span>
       ),
     },
     {
@@ -175,20 +174,30 @@ const PromotionsPage: React.FC = () => {
       width: 110,
       align: "center" as const,
       render: (_: any, record: Promotion) => {
-        const percentage = record.usageLimit > 0 
-          ? Math.round((record.usedCount / record.usageLimit) * 100)
-          : 0;
-        const isFull = record.usedCount >= record.usageLimit && record.usageLimit > 0;
-        
+        const percentage =
+          record.usageLimit > 0
+            ? Math.round((record.usedCount / record.usageLimit) * 100)
+            : 0;
+        const isFull =
+          record.usedCount >= record.usageLimit && record.usageLimit > 0;
+
         return (
           <div style={{ fontSize: "12px" }}>
-            <div style={{ fontWeight: 500 }}>{`${record.usedCount}/${record.usageLimit}`}</div>
+            <div
+              style={{ fontWeight: 500 }}
+            >{`${record.usedCount}/${record.usageLimit}`}</div>
             {record.usageLimit > 0 && (
-              <div style={{ 
-                fontSize: "10px", 
-                color: isFull ? "#ff4d4f" : percentage > 80 ? "#faad14" : "#52c41a",
-                fontWeight: 500
-              }}>
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: isFull
+                    ? "#ff4d4f"
+                    : percentage > 80
+                    ? "#faad14"
+                    : "#52c41a",
+                  fontWeight: 500,
+                }}
+              >
                 {percentage}%
               </div>
             )}
@@ -206,15 +215,17 @@ const PromotionsPage: React.FC = () => {
         const colorMap: any = {
           green: "#52c41a",
           orange: "#faad14",
-          red: "#ff4d4f"
+          red: "#ff4d4f",
         };
         return (
           <Tooltip title={statusInfo.tooltip}>
-            <span style={{ 
-              fontSize: "12px", 
-              fontWeight: 600,
-              color: colorMap[statusInfo.color] || statusInfo.color
-            }}>
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 600,
+                color: colorMap[statusInfo.color] || statusInfo.color,
+              }}
+            >
               {statusInfo.text}
             </span>
           </Tooltip>
@@ -240,9 +251,9 @@ const PromotionsPage: React.FC = () => {
             title="Bạn có chắc muốn xóa?"
             onConfirm={() => handleDelete(record.promoId)}
           >
-            <Button 
-              type="link" 
-              danger 
+            <Button
+              type="link"
+              danger
               icon={<DeleteOutlined />}
               style={{ fontSize: "13px" }}
             >

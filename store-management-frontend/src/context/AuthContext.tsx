@@ -27,9 +27,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   useEffect(() => {
     // Check if user is already logged in
-    const token = authService.getToken();
     const savedUser = authService.getCurrentUser();
-    if (token && savedUser) {
+    if (savedUser) {
       setUser(savedUser);
     }
     setLoading(false);
@@ -37,7 +36,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   const login = async (data: LoginRequest) => {
     const response = await authService.login(data);
-    authService.saveAuth(response.token, response);
+    authService.saveAuth(response);
     setUser(response);
   };
 

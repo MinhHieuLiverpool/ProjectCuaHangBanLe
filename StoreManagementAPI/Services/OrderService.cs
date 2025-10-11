@@ -3,12 +3,13 @@ using StoreManagementAPI.Data;
 using StoreManagementAPI.DTOs;
 using StoreManagementAPI.Models;
 using StoreManagementAPI.Repositories;
+using System.Text.Json;
 
 namespace StoreManagementAPI.Services
 {
     public interface IOrderService
     {
-        Task<OrderResponseDto?> CreateOrderAsync(CreateOrderDto dto);
+        Task<OrderResponseDto?> CreateOrderAsync(CreateOrderDto dto, string? ipAddress = null);
         Task<OrderResponseDto?> GetOrderByIdAsync(int id);
         Task<IEnumerable<OrderResponseDto>> GetAllOrdersAsync();
         Task<bool> UpdateOrderStatusAsync(int orderId, string status);
@@ -40,16 +41,34 @@ namespace StoreManagementAPI.Services
             _promotionRepository = promotionRepository;
         }
 
-        public async Task<OrderResponseDto?> CreateOrderAsync(CreateOrderDto dto)
+        public async Task<OrderResponseDto?> CreateOrderAsync(CreateOrderDto dto, string? ipAddress = null)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                // Ensure userId exists in database, otherwise set to null
+                int? userId = null;
+                if (dto.UserId.HasValue)
+                {
+                    var userExists = await _context.Users.AnyAsync(u => u.UserId == dto.UserId.Value);
+                    if (userExists)
+                    {
+                        userId = dto.UserId.Value;
+                    }
+                }
+                
+                // If still null, try to find a default user
+                if (!userId.HasValue)
+                {
+                    var defaultUser = await _context.Users.FirstOrDefaultAsync();
+                    userId = defaultUser?.UserId;
+                }
+
                 // Create order
                 var order = new Order
                 {
                     CustomerId = dto.CustomerId,
-                    UserId = dto.UserId,
+                    UserId = userId, // Can be null
                     Status = "pending",
                     OrderDate = DateTime.Now
                 };
@@ -63,13 +82,14 @@ namespace StoreManagementAPI.Services
                     var product = await _context.Products.FindAsync(item.ProductId);
                     if (product == null) continue;
 
-                    // Check inventory
-                    var inventory = await _context.Inventories
-                        .FirstOrDefaultAsync(i => i.ProductId == item.ProductId);
+                    // Check total inventory across all warehouses
+                    var totalInventory = await _context.Inventories
+                        .Where(i => i.ProductId == item.ProductId)
+                        .SumAsync(i => i.Quantity);
                     
-                    if (inventory == null || inventory.Quantity < item.Quantity)
+                    if (totalInventory < item.Quantity)
                     {
-                        throw new Exception($"Insufficient stock for product {product.ProductName}");
+                        throw new Exception($"Insufficient stock for product {product.ProductName}. Available: {totalInventory}, Requested: {item.Quantity}");
                     }
 
                     var subtotal = product.Price * item.Quantity;
@@ -84,9 +104,22 @@ namespace StoreManagementAPI.Services
                     };
                     orderItems.Add(orderItem);
 
-                    // Update inventory
-                    inventory.Quantity -= item.Quantity;
-                    inventory.UpdatedAt = DateTime.Now;
+                    // Update inventory - deduct from warehouses with stock (FIFO approach)
+                    var inventories = await _context.Inventories
+                        .Where(i => i.ProductId == item.ProductId && i.Quantity > 0)
+                        .OrderBy(i => i.WarehouseId) // Ưu tiên kho theo thứ tự ID
+                        .ToListAsync();
+                    
+                    int remainingQuantity = item.Quantity;
+                    foreach (var inv in inventories)
+                    {
+                        if (remainingQuantity <= 0) break;
+                        
+                        int deductQuantity = Math.Min(inv.Quantity, remainingQuantity);
+                        inv.Quantity -= deductQuantity;
+                        inv.UpdatedAt = DateTime.Now;
+                        remainingQuantity -= deductQuantity;
+                    }
                 }
 
                 order.TotalAmount = totalAmount;
@@ -133,6 +166,10 @@ namespace StoreManagementAPI.Services
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Audit log được xử lý ở Controller
+                await _context.SaveChangesAsync();
+
                 await transaction.CommitAsync();
 
                 return await GetOrderByIdAsync(createdOrder.OrderId);

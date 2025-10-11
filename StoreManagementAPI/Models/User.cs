@@ -28,10 +28,15 @@ namespace StoreManagementAPI.Models
         [StringLength(10)]
         public string Role { get; set; } = "staff";
 
+        [Column("status")]
+        [StringLength(20)]
+        public string Status { get; set; } = "active"; // active, inactive, deleted
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-        // Navigation property
+        // Navigation properties
         public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
+        public virtual ICollection<PurchaseOrder> PurchaseOrders { get; set; } = new List<PurchaseOrder>();
     }
 }

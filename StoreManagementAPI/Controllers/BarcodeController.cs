@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+// using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StoreManagementAPI.Data;
@@ -17,7 +17,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPost("generate-all")]
-        [AllowAnonymous]
+        // [AllowAnonymous] - B? AUTHENTICATION
         public async Task<ActionResult> GenerateAllBarcodes()
         {
             try
@@ -76,7 +76,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpGet("export")]
-        [AllowAnonymous]
+        // [AllowAnonymous] - B? AUTHENTICATION
         public async Task<ActionResult> ExportBarcodes()
         {
             try

@@ -3,25 +3,16 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace StoreManagementAPI.Models
 {
-    [Table("suppliers")]
-    public class Supplier
+    [Table("warehouses")]
+    public class Warehouse
     {
         [Key]
-        [Column("supplier_id")]
-        public int SupplierId { get; set; }
+        [Column("warehouse_id")]
+        public int WarehouseId { get; set; }
 
-        [Required]
-        [Column("name")]
+        [Column("warehouse_name")]
         [StringLength(100)]
-        public string Name { get; set; } = string.Empty;
-
-        [Column("phone")]
-        [StringLength(20)]
-        public string? Phone { get; set; }
-
-        [Column("email")]
-        [StringLength(100)]
-        public string? Email { get; set; }
+        public string? WarehouseName { get; set; }
 
         [Column("address")]
         public string? Address { get; set; }
@@ -31,7 +22,7 @@ namespace StoreManagementAPI.Models
         public string Status { get; set; } = "active"; // active, inactive, deleted
 
         // Navigation properties
-        public virtual ICollection<Product> Products { get; set; } = new List<Product>();
+        public virtual ICollection<Inventory> Inventories { get; set; } = new List<Inventory>();
         public virtual ICollection<PurchaseOrder> PurchaseOrders { get; set; } = new List<PurchaseOrder>();
     }
 }

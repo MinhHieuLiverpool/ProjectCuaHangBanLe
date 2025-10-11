@@ -323,7 +323,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       key: "unitPrice",
       width: "22%",
       align: "right" as const,
-      render: (price: number) => `${price.toLocaleString("vi-VN")}đ`,
+      render: (price: number) => `${(price || 0).toLocaleString("vi-VN")}đ`,
     },
     {
       title: "Thành tiền",
@@ -331,7 +331,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       key: "totalPrice",
       width: "22%",
       align: "right" as const,
-      render: (price: number) => `${price.toLocaleString("vi-VN")}đ`,
+      render: (price: number) => `${(price || 0).toLocaleString("vi-VN")}đ`,
     },
     {
       title: "",
@@ -474,14 +474,16 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <Select.Option
                       key={prod.productId}
                       value={prod.productId}
-                      label={`${prod.productName} - ${prod.price.toLocaleString(
-                        "vi-VN"
-                      )}đ (Còn: ${prod.stockQuantity || 0})`}
+                      label={`${prod.productName} - ${(
+                        prod.price || 0
+                      ).toLocaleString("vi-VN")}đ (Còn: ${
+                        prod.stockQuantity || 0
+                      })`}
                       disabled={!prod.stockQuantity || prod.stockQuantity === 0}
                     >
                       <span style={{ fontSize: "14px" }}>
                         {prod.productName} -{" "}
-                        {prod.price.toLocaleString("vi-VN")}đ
+                        {(prod.price || 0).toLocaleString("vi-VN")}đ
                         <span
                           style={{
                             color:

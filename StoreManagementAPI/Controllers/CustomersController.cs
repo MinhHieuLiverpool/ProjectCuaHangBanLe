@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+// using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StoreManagementAPI.Models;
 using StoreManagementAPI.Repositories;
@@ -7,7 +7,7 @@ namespace StoreManagementAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    // [Authorize] - B? AUTHENTICATION
     public class CustomersController : ControllerBase
     {
         private readonly IRepository<Customer> _customerRepository;

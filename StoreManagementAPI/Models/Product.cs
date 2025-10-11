@@ -29,13 +29,16 @@ namespace StoreManagementAPI.Models
         [Column("price", TypeName = "decimal(10,2)")]
         public decimal Price { get; set; }
 
+        [Column("cost_price", TypeName = "decimal(10,2)")]
+        public decimal CostPrice { get; set; } = 0;
+
         [Column("unit")]
         [StringLength(20)]
         public string Unit { get; set; } = "pcs";
 
         [Column("status")]
         [StringLength(20)]
-        public string Status { get; set; } = "active"; // active, inactive
+        public string Status { get; set; } = "active"; // active, inactive, deleted
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
@@ -47,7 +50,7 @@ namespace StoreManagementAPI.Models
         [ForeignKey("SupplierId")]
         public virtual Supplier? Supplier { get; set; }
 
-        public virtual Inventory? Inventory { get; set; }
+        public virtual ICollection<Inventory> Inventories { get; set; } = new List<Inventory>();
         public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
     }
 }

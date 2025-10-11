@@ -15,6 +15,7 @@ export interface LoginResponse {
   username: string;
   fullName: string;
   role: string;
+  userId?: number;
 }
 
 export interface Product {

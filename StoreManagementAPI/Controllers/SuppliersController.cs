@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+// using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StoreManagementAPI.Models;
 using StoreManagementAPI.Repositories;
@@ -7,7 +7,7 @@ namespace StoreManagementAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize] // Yêu cầu đăng nhập, nhưng không giới hạn role
+    // [Authorize] - B? AUTHENTICATION // Yêu cầu đăng nhập, nhưng không giới hạn role
     public class SuppliersController : ControllerBase
     {
         private readonly IRepository<Supplier> _supplierRepository;
@@ -35,7 +35,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "admin")] // Chỉ admin mới được tạo mới
+        // [Authorize] - B? AUTHENTICATION // Chỉ admin mới được tạo mới
         public async Task<ActionResult<Supplier>> Create([FromBody] Supplier supplier)
         {
             var created = await _supplierRepository.AddAsync(supplier);
@@ -43,7 +43,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = "admin")] // Chỉ admin mới được cập nhật
+        // [Authorize] - B? AUTHENTICATION // Chỉ admin mới được cập nhật
         public async Task<ActionResult<Supplier>> Update(int id, [FromBody] Supplier supplier)
         {
             var existing = await _supplierRepository.GetByIdAsync(id);
@@ -59,7 +59,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Roles = "admin")] // Chỉ admin mới được xóa
+        // [Authorize] - B? AUTHENTICATION // Chỉ admin mới được xóa
         public async Task<ActionResult> Delete(int id)
         {
             var result = await _supplierRepository.DeleteAsync(id);

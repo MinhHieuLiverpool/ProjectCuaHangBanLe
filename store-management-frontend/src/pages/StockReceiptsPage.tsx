@@ -1,186 +1,632 @@
-import { PlusOutlined } from '@ant-design/icons';
-import { Button, Card, Form, InputNumber, Select, Table, Tag, message } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import { DeleteOutlined, EyeOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  Button,
+  Card,
+  Form,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tag,
+  message,
+  Popconfirm,
+} from "antd";
+import type { ColumnsType } from "antd/es/table";
+import React, { useEffect, useState } from "react";
+import api from "../services/api";
+
+interface Supplier {
+  supplierId: number;
+  name: string;
+}
+
+interface Warehouse {
+  warehouseId: number;
+  warehouseName: string;
+}
 
 interface Product {
   productId: number;
   productName: string;
-  price: number;
-  unit: string;
-  status: string;
-  categoryName?: string;
+  barcode?: string;
+  costPrice: number;
 }
 
-interface StockReceipt {
-  inventoryId: number;
+interface PurchaseItem {
   productId: number;
-  productName: string;
+  productName?: string;
+  barcode?: string;
   quantity: number;
-  updatedAt: string;
+  costPrice: number;
+  subtotal?: number;
+  currentStock?: number;
+}
+
+interface PurchaseOrder {
+  purchaseId: number;
+  supplierId: number;
+  supplierName?: string;
+  userId: number;
+  userName?: string;
+  purchaseDate: string;
+  totalAmount: number;
+  status: string;
+  items: PurchaseItem[];
 }
 
 const StockReceiptsPage: React.FC = () => {
   const [form] = Form.useForm();
-  const [receipts, setReceipts] = useState<StockReceipt[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(
+    null
+  );
+  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
 
-  // fetch sp
-  const fetchProducts = async () => {
+  const fetchData = async () => {
     try {
-      const response = await api.get('/products');
-      // search sp active
-      const activeProducts = response.data.filter((product: Product) => product.status === 'active');
-      setProducts(activeProducts);
+      const [productsRes, suppliersRes, warehousesRes] = await Promise.all([
+        api.get("/products"),
+        api.get("/suppliers"),
+        api.get("/warehouses"),
+      ]);
+      setProducts(productsRes.data.filter((p: any) => p.status === "active"));
+      setSuppliers(suppliersRes.data.filter((s: any) => s.status === "active"));
+      setWarehouses(
+        warehousesRes.data.filter((w: any) => w.status === "active")
+      );
     } catch (error) {
-      message.error('Không thể tải danh sách sản phẩm');
+      message.error("Không thể tải dữ liệu");
     }
   };
 
-  //fecth ton kho
-  const fetchStockReceipts = async () => {
+  const fetchPurchaseOrders = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/inventory');
-      setReceipts(response.data);
+      const response = await api.get("/purchaseorders");
+      setPurchaseOrders(response.data);
     } catch (error) {
-      message.error('Không thể tải danh sách tồn kho');
+      message.error("Không thể tải danh sách phiếu nhập hàng");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
-    fetchStockReceipts();
+    fetchData();
+    fetchPurchaseOrders();
   }, []);
 
-  // xly nhaphang
-  const handleSubmit = async (values: { productId: number; quantity: number }) => {
+  const addPurchaseItem = () => {
+    setPurchaseItems([
+      ...purchaseItems,
+      { productId: 0, quantity: 1, costPrice: 0, currentStock: 0 },
+    ]);
+  };
+
+  const removePurchaseItem = (index: number) => {
+    setPurchaseItems(purchaseItems.filter((_, i) => i !== index));
+  };
+
+  const updatePurchaseItem = async (
+    index: number,
+    field: string,
+    value: any
+  ) => {
+    const newItems = [...purchaseItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+
+    // If product changed, fetch its cost price and current stock
+    if (field === "productId" && value) {
+      const selectedProduct = products.find((p) => p.productId === value);
+      console.log("Selected product:", selectedProduct);
+
+      if (selectedProduct) {
+        newItems[index].costPrice = selectedProduct.costPrice || 0;
+        newItems[index].productName = selectedProduct.productName;
+
+        // Fetch current stock for selected warehouse
+        const warehouseId = form.getFieldValue("warehouseId");
+        console.log("Warehouse ID:", warehouseId);
+
+        if (warehouseId) {
+          try {
+            const response = await api.get(
+              `/inventory/warehouse/${warehouseId}`
+            );
+            console.log("Inventory response:", response.data);
+
+            const inventory = response.data.find(
+              (inv: any) => inv.productId === value
+            );
+            newItems[index].currentStock = inventory ? inventory.quantity : 0;
+            console.log("Current stock:", newItems[index].currentStock);
+          } catch (error) {
+            console.error("Error fetching inventory:", error);
+            newItems[index].currentStock = 0;
+          }
+        } else {
+          // If no warehouse selected yet, set stock to 0 and show message
+          newItems[index].currentStock = 0;
+          message.warning("Vui lòng chọn kho trước để xem tồn kho");
+        }
+      }
+    }
+
+    setPurchaseItems(newItems);
+  };
+
+  const handleWarehouseChange = async (warehouseId: number) => {
+    // Update current stock for all items when warehouse changes
+    const newItems = await Promise.all(
+      purchaseItems.map(async (item) => {
+        if (item.productId) {
+          try {
+            const response = await api.get(
+              `/inventory/warehouse/${warehouseId}`
+            );
+            const inventory = response.data.find(
+              (inv: any) => inv.productId === item.productId
+            );
+            return {
+              ...item,
+              currentStock: inventory ? inventory.quantity : 0,
+            };
+          } catch (error) {
+            return { ...item, currentStock: 0 };
+          }
+        }
+        return item;
+      })
+    );
+    setPurchaseItems(newItems);
+  };
+
+  const handleCreateModalOpen = () => {
+    form.resetFields();
+    setPurchaseItems([]);
+    setIsCreateModalVisible(true);
+  };
+
+  const handleCreateModalClose = () => {
+    setIsCreateModalVisible(false);
+    form.resetFields();
+    setPurchaseItems([]);
+  };
+
+  const handleSubmit = async (values: any) => {
+    if (purchaseItems.length === 0) {
+      message.error("Vui lòng thêm ít nhất một sản phẩm");
+      return;
+    }
+
+    const hasInvalid = purchaseItems.some(
+      (item) => !item.productId || item.quantity <= 0
+    );
+
+    if (hasInvalid) {
+      message.error("Vui lòng chọn sản phẩm và nhập số lượng");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await api.post('/inventory/add-stock', values);
-      message.success('Nhập hàng thành công!');
-      form.resetFields();
-      fetchStockReceipts(); // refresh dsach
+      // Chỉ gửi các field cần thiết cho backend
+      const itemsToSubmit = purchaseItems.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        costPrice: item.costPrice,
+      }));
+
+      await api.post("/purchaseorders", {
+        supplierId: values.supplierId,
+        warehouseId: values.warehouseId,
+        items: itemsToSubmit,
+      });
+      message.success("Tạo phiếu nhập hàng thành công");
+      handleCreateModalClose();
+      fetchPurchaseOrders();
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Nhập hàng thất bại');
+      console.error("Lỗi tạo phiếu nhập:", error.response?.data);
+      message.error(
+        error.response?.data?.message || "Không thể tạo phiếu nhập hàng"
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  const columns: ColumnsType<StockReceipt> = [
+  const updateStatus = async (purchaseId: number, status: string) => {
+    try {
+      await api.patch(`/purchaseorders/${purchaseId}/status`, { status });
+      message.success("Cập nhật trạng thái thành công");
+      fetchPurchaseOrders();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || "Không thể cập nhật");
+    }
+  };
+
+  const viewDetails = async (purchaseId: number) => {
+    try {
+      const response = await api.get(`/purchaseorders/${purchaseId}`);
+      setSelectedOrder(response.data);
+      setIsDetailModalVisible(true);
+    } catch (error) {
+      message.error("Không thể tải chi tiết phiếu nhập");
+    }
+  };
+
+  const deletePurchase = async (purchaseId: number) => {
+    try {
+      await api.delete(`/purchaseorders/${purchaseId}`);
+      message.success("Xóa phiếu nhập thành công");
+      fetchPurchaseOrders();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || "Không thể xóa");
+    }
+  };
+
+  const columns: ColumnsType<PurchaseOrder> = [
     {
-      title: 'Mã',
-      dataIndex: 'inventoryId',
-      key: 'inventoryId',
-      width: 80,
-      render: (id: number) => <Tag color="blue">#{id}</Tag>,
+      title: "Mã phiếu",
+      dataIndex: "purchaseId",
+      key: "purchaseId",
+      width: 100,
+    },
+    { title: "Nhà cung cấp", dataIndex: "supplierName", key: "supplierName" },
+    { title: "Người nhập", dataIndex: "userName", key: "userName" },
+    {
+      title: "Ngày nhập",
+      dataIndex: "purchaseDate",
+      key: "purchaseDate",
+      render: (date: string) => new Date(date).toLocaleString("vi-VN"),
     },
     {
-      title: 'Tên sản phẩm',
-      dataIndex: 'productName',
-      key: 'productName',
-      ellipsis: true,
+      title: "Tổng tiền",
+      dataIndex: "totalAmount",
+      key: "totalAmount",
+      render: (amount: number) => `${(amount || 0).toLocaleString("vi-VN")}đ`,
     },
     {
-      title: 'Số lượng tồn kho',
-      dataIndex: 'quantity',
-      key: 'quantity',
-      width: 150,
-      align: 'right',
-      render: (quantity: number) => (
-        <span style={{ fontWeight: 600, color: quantity > 0 ? '#52c41a' : '#ff4d4f' }}>
-          {quantity}
-        </span>
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      render: (status: string) => {
+        const configs: any = {
+          pending: { color: "blue", text: "Chờ xử lý" },
+          completed: { color: "green", text: "Đã hoàn thành" },
+          canceled: { color: "red", text: "Đã hủy" },
+        };
+        const config = configs[status] || configs.pending;
+        return <Tag color={config.color}>{config.text}</Tag>;
+      },
+    },
+    {
+      title: "Thao tác",
+      key: "action",
+      render: (_: any, record: PurchaseOrder) => (
+        <Space size="small">
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            onClick={() => viewDetails(record.purchaseId)}
+          >
+            Xem
+          </Button>
+          {record.status === "pending" && (
+            <>
+              <Button
+                type="link"
+                onClick={() => updateStatus(record.purchaseId, "completed")}
+                style={{ color: "green" }}
+              >
+                Hoàn thành
+              </Button>
+              <Button
+                type="link"
+                onClick={() => updateStatus(record.purchaseId, "canceled")}
+                danger
+              >
+                Hủy
+              </Button>
+              <Popconfirm
+                title="Bạn có chắc muốn xóa?"
+                onConfirm={() => deletePurchase(record.purchaseId)}
+                okText="Có"
+                cancelText="Không"
+              >
+                <Button type="link" danger icon={<DeleteOutlined />}>
+                  Xóa
+                </Button>
+              </Popconfirm>
+            </>
+          )}
+        </Space>
       ),
     },
+  ];
+
+  const itemColumns: ColumnsType<PurchaseItem> = [
+    { title: "Sản phẩm", dataIndex: "productName", key: "productName" },
+    { title: "Mã vạch", dataIndex: "barcode", key: "barcode" },
+    { title: "Số lượng", dataIndex: "quantity", key: "quantity" },
     {
-      title: 'Cập nhật lần cuối',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      width: 180,
-      render: (date: string) => new Date(date).toLocaleString('vi-VN'),
+      title: "Giá nhập",
+      dataIndex: "costPrice",
+      key: "costPrice",
+      render: (price: number) => `${(price || 0).toLocaleString("vi-VN")}đ`,
+    },
+    {
+      title: "Thành tiền",
+      dataIndex: "subtotal",
+      key: "subtotal",
+      render: (subtotal: number) =>
+        `${(subtotal || 0).toLocaleString("vi-VN")}đ`,
     },
   ];
 
   return (
-    <div >
-      <h2 >Quản lý nhập hàng</h2>
-      <Card title="Nhập hàng mới" style={{ marginBottom: '24px' }}>
-        <Form
-          form={form}
-          layout="inline"
-          onFinish={handleSubmit}
-          style={{ gap: '16px', display: 'flex', flexWrap: 'wrap' }}
-        >
-          <Form.Item
-            name="productId"
-            label="Sản phẩm"
-            rules={[{ required: true, message: 'Vui lòng chọn sản phẩm' }]}
-            style={{ minWidth: '300px', flex: 1 }}
+    <div>
+      <Card
+        title="Nhập hàng"
+        extra={
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleCreateModalOpen}
           >
-            <Select
-              showSearch
-              placeholder="Chọn sản phẩm"
-              optionFilterProp="label"
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-              options={products.map((product) => ({
-                label: `${product.productName} (${product.unit})`,
-                value: product.productId,
-              }))}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="quantity"
-            label="Số lượng"
-            rules={[
-              { required: true, message: 'Vui lòng nhập số lượng' },
-              { type: 'number', min: 1, message: 'Số lượng phải lớn hơn 0' },
-            ]}
-            style={{ minWidth: '200px' }}
-          >
-            <InputNumber
-              placeholder="Nhập số lượng"
-              style={{ width: '100%' }}
-              min={1}
-            />
-          </Form.Item>
-
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              icon={<PlusOutlined />}
-              loading={submitting}
-            >
-              Nhập hàng
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-
-      <Card title="Danh sách tồn kho">
+            Tạo phiếu nhập
+          </Button>
+        }
+      >
         <Table
           columns={columns}
-          dataSource={receipts}
-          rowKey="inventoryId"
+          dataSource={purchaseOrders}
+          rowKey="purchaseId"
           loading={loading}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showTotal: (total) => `Tổng ${total} sản phẩm`,
-          }}
-          scroll={{ x: 800 }}
+          pagination={{ pageSize: 10 }}
+          onRow={(record) => ({
+            onDoubleClick: () => viewDetails(record.purchaseId),
+          })}
         />
       </Card>
+
+      <Modal
+        title="Tạo phiếu nhập hàng"
+        open={isCreateModalVisible}
+        onCancel={handleCreateModalClose}
+        footer={null}
+        width={900}
+      >
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item
+            label="Nhà cung cấp"
+            name="supplierId"
+            rules={[{ required: true, message: "Vui lòng chọn nhà cung cấp" }]}
+          >
+            <Select
+              placeholder="Chọn nhà cung cấp"
+              showSearch
+              optionFilterProp="children"
+            >
+              {suppliers.map((s) => (
+                <Select.Option key={s.supplierId} value={s.supplierId}>
+                  {s.name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="Kho nhập"
+            name="warehouseId"
+            rules={[{ required: true, message: "Vui lòng chọn kho" }]}
+          >
+            <Select
+              placeholder="Chọn kho"
+              showSearch
+              optionFilterProp="children"
+              onChange={(value) => handleWarehouseChange(value)}
+            >
+              {warehouses.map((w) => (
+                <Select.Option key={w.warehouseId} value={w.warehouseId}>
+                  {w.warehouseName}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <div style={{ marginBottom: 16 }}>
+            <h4>Danh sách sản phẩm</h4>
+            {purchaseItems.map((item, index) => (
+              <div
+                key={index}
+                style={{
+                  marginBottom: 16,
+                  padding: 12,
+                  border: "1px solid #d9d9d9",
+                  borderRadius: 4,
+                  backgroundColor: "#fafafa",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginBottom: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <Select
+                    style={{ flex: 2 }}
+                    placeholder="Chọn sản phẩm"
+                    showSearch
+                    optionFilterProp="children"
+                    value={item.productId || undefined}
+                    onChange={(value) =>
+                      updatePurchaseItem(index, "productId", value)
+                    }
+                  >
+                    {products.map((p) => (
+                      <Select.Option key={p.productId} value={p.productId}>
+                        {p.productName} - {p.barcode}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => removePurchaseItem(index)}
+                  />
+                </div>
+                <div
+                  style={{ display: "flex", gap: 8, alignItems: "flex-start" }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{ fontSize: 12, color: "#666", marginBottom: 4 }}
+                    >
+                      Giá nhập (không sửa được)
+                    </div>
+                    <InputNumber
+                      style={{ width: "100%" }}
+                      placeholder="Giá nhập"
+                      min={0}
+                      disabled
+                      formatter={(value) =>
+                        `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "đ"
+                      }
+                      value={item.costPrice}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{ fontSize: 12, color: "#666", marginBottom: 4 }}
+                    >
+                      Số lượng tồn kho hiện tại
+                    </div>
+                    <InputNumber
+                      style={{ width: "100%" }}
+                      placeholder="Tồn kho"
+                      disabled
+                      value={item.currentStock || 0}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{ fontSize: 12, color: "#666", marginBottom: 4 }}
+                    >
+                      <span style={{ color: "red" }}>* </span>Số lượng nhập
+                    </div>
+                    <InputNumber
+                      style={{ width: "100%" }}
+                      placeholder="Nhập số lượng"
+                      min={1}
+                      value={item.quantity}
+                      onChange={(value) =>
+                        updatePurchaseItem(index, "quantity", value || 1)
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              onClick={addPurchaseItem}
+              block
+            >
+              Thêm sản phẩm
+            </Button>
+          </div>
+
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={submitting}>
+                Tạo phiếu nhập
+              </Button>
+              <Button onClick={handleCreateModalClose}>Hủy</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={`Chi tiết phiếu nhập #${selectedOrder?.purchaseId}`}
+        open={isDetailModalVisible}
+        onCancel={() => setIsDetailModalVisible(false)}
+        footer={null}
+        width={900}
+      >
+        {selectedOrder && (
+          <div>
+            <Card size="small" style={{ marginBottom: 16 }}>
+              <Space direction="vertical" style={{ width: "100%" }}>
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <div>
+                    <strong>Nhà cung cấp:</strong> {selectedOrder.supplierName}
+                  </div>
+                  <div>
+                    <strong>Người nhập:</strong> {selectedOrder.userName}
+                  </div>
+                </div>
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <div>
+                    <strong>Ngày nhập:</strong>{" "}
+                    {new Date(selectedOrder.purchaseDate).toLocaleString(
+                      "vi-VN"
+                    )}
+                  </div>
+                  <div>
+                    <strong>Trạng thái:</strong>{" "}
+                    <Tag
+                      color={
+                        selectedOrder.status === "completed"
+                          ? "green"
+                          : selectedOrder.status === "canceled"
+                          ? "red"
+                          : "blue"
+                      }
+                    >
+                      {selectedOrder.status === "completed"
+                        ? "Đã hoàn thành"
+                        : selectedOrder.status === "canceled"
+                        ? "Đã hủy"
+                        : "Chờ xử lý"}
+                    </Tag>
+                  </div>
+                </div>
+                <div
+                  style={{ fontSize: 18, fontWeight: "bold", color: "#1890ff" }}
+                >
+                  Tổng tiền:{" "}
+                  {(selectedOrder.totalAmount || 0).toLocaleString("vi-VN")}đ
+                </div>
+              </Space>
+            </Card>
+            <h4>Chi tiết sản phẩm:</h4>
+            <Table
+              columns={itemColumns}
+              dataSource={selectedOrder.items}
+              rowKey={(item) => `${item.productId}-${item.quantity}`}
+              pagination={false}
+              size="small"
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

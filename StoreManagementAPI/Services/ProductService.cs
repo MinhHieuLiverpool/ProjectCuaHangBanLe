@@ -39,7 +39,7 @@ namespace StoreManagementAPI.Services
             var products = await _context.Products
                 .Include(p => p.Category)
                 .Include(p => p.Supplier)
-                .Include(p => p.Inventory)
+                .Include(p => p.Inventories)
                 .ToListAsync();
 
             return products.Select(p => new ProductDto
@@ -52,9 +52,10 @@ namespace StoreManagementAPI.Services
                 ProductName = p.ProductName,
                 Barcode = p.Barcode,
                 Price = p.Price,
+                CostPrice = p.CostPrice,
                 Unit = p.Unit,
                 Status = p.Status,
-                StockQuantity = p.Inventory?.Quantity
+                StockQuantity = p.Inventories?.Sum(i => i.Quantity) ?? 0
             });
         }
 
@@ -70,7 +71,7 @@ namespace StoreManagementAPI.Services
             var products = await _context.Products
                 .Include(p => p.Category)
                 .Include(p => p.Supplier)
-                .Include(p => p.Inventory)
+                .Include(p => p.Inventories)
                 .Where(p =>
                     p.ProductName.ToLower().Contains(searchTerm) ||
                     (p.Barcode != null && p.Barcode.ToLower().Contains(searchTerm)) ||
@@ -88,9 +89,10 @@ namespace StoreManagementAPI.Services
                 ProductName = p.ProductName,
                 Barcode = p.Barcode,
                 Price = p.Price,
+                CostPrice = p.CostPrice,
                 Unit = p.Unit,
                 Status = p.Status,
-                StockQuantity = p.Inventory?.Quantity
+                StockQuantity = p.Inventories?.Sum(i => i.Quantity) ?? 0
             });
         }
 
@@ -99,7 +101,7 @@ namespace StoreManagementAPI.Services
             var product = await _context.Products
                 .Include(p => p.Category)
                 .Include(p => p.Supplier)
-                .Include(p => p.Inventory)
+                .Include(p => p.Inventories)
                 .FirstOrDefaultAsync(p => p.ProductId == id);
 
             if (product == null) return null;
@@ -114,9 +116,10 @@ namespace StoreManagementAPI.Services
                 ProductName = product.ProductName,
                 Barcode = product.Barcode,
                 Price = product.Price,
+                CostPrice = product.CostPrice,
                 Unit = product.Unit,
                 Status = product.Status,
-                StockQuantity = product.Inventory?.Quantity
+                StockQuantity = product.Inventories?.Sum(i => i.Quantity) ?? 0
             };
         }
 
@@ -130,7 +133,7 @@ namespace StoreManagementAPI.Services
             var product = await _context.Products
                 .Include(p => p.Category)
                 .Include(p => p.Supplier)
-                .Include(p => p.Inventory)
+                .Include(p => p.Inventories)
                 .FirstOrDefaultAsync(p => p.Barcode == barcode.Trim());
 
             if (product == null) return null;
@@ -145,9 +148,10 @@ namespace StoreManagementAPI.Services
                 ProductName = product.ProductName,
                 Barcode = product.Barcode,
                 Price = product.Price,
+                CostPrice = product.CostPrice,
                 Unit = product.Unit,
                 Status = product.Status,
-                StockQuantity = product.Inventory?.Quantity
+                StockQuantity = product.Inventories?.Sum(i => i.Quantity) ?? 0
             };
         }
 
@@ -166,7 +170,9 @@ namespace StoreManagementAPI.Services
                 ProductName = dto.ProductName,
                 Barcode = dto.Barcode,
                 Price = dto.Price,
-                Unit = dto.Unit
+                CostPrice = dto.CostPrice,
+                Unit = dto.Unit,
+                CreatedAt = DateTime.Now
             };
 
             var createdProduct = await _productRepository.AddAsync(product);

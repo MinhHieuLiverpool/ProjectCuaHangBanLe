@@ -1,7 +1,12 @@
 import { categoryService, supplierService } from "@/services/common.service";
 import { productService } from "@/services/product.service";
 import { Category, Product, Supplier } from "@/types";
-import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+  SearchOutlined,
+} from "@ant-design/icons";
 import {
   Button,
   Form,
@@ -152,7 +157,7 @@ const ProductsPage: React.FC = () => {
       key: "price",
       width: 120,
       render: (price: number) =>
-        price ? `${price.toLocaleString("vi-VN")}đ` : "0đ",
+        price ? `${(price || 0).toLocaleString("vi-VN")}đ` : "0đ",
     },
     {
       title: "Đơn vị",
@@ -252,7 +257,11 @@ const ProductsPage: React.FC = () => {
         <Input.Search
           placeholder="Tìm kiếm theo tên, mã vạch, danh mục hoặc nhà cung cấp..."
           allowClear
-          enterButton={<><SearchOutlined /> Tìm kiếm</>}
+          enterButton={
+            <>
+              <SearchOutlined /> Tìm kiếm
+            </>
+          }
           size="large"
           onSearch={handleSearch}
           onChange={(e) => {
@@ -337,12 +346,16 @@ const ProductsPage: React.FC = () => {
               min={0}
               style={{ width: "100%" }}
               disabled={!!editingProduct}
-              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+              formatter={(value) =>
+                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+              }
             />
           </Form.Item>
 
           {editingProduct && (
-            <div style={{ marginBottom: 16, color: "#ff4d4f", fontSize: "12px" }}>
+            <div
+              style={{ marginBottom: 16, color: "#ff4d4f", fontSize: "12px" }}
+            >
               * Giá không thể sửa đổi khi cập nhật sản phẩm
             </div>
           )}

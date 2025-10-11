@@ -1,13 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StoreManagementAPI.DTOs;
 using StoreManagementAPI.Services;
+using System.Security.Claims;
 
 namespace StoreManagementAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    // // [Authorize] - BỎ AUTHENTICATION
     public class OrdersController : ControllerBase
     {
         private readonly IOrderService _orderService;
@@ -15,6 +15,12 @@ namespace StoreManagementAPI.Controllers
         public OrdersController(IOrderService orderService)
         {
             _orderService = orderService;
+        }
+
+        private int? GetCurrentUserId()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return userIdClaim != null ? int.Parse(userIdClaim) : null;
         }
 
         [HttpGet]
@@ -40,11 +46,13 @@ namespace StoreManagementAPI.Controllers
         {
             try
             {
-                var order = await _orderService.CreateOrderAsync(dto);
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+                var order = await _orderService.CreateOrderAsync(dto, ipAddress);
                 if (order == null)
                 {
                     return BadRequest(new { message = "Failed to create order" });
                 }
+
                 return CreatedAtAction(nameof(GetOrder), new { id = order.OrderId }, order);
             }
             catch (Exception ex)

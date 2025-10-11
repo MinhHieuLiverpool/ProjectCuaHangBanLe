@@ -19,6 +19,9 @@ namespace StoreManagementAPI.Data
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<Payment> Payments { get; set; }
+        public DbSet<Warehouse> Warehouses { get; set; }
+        public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
+        public DbSet<PurchaseItem> PurchaseItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -39,9 +42,15 @@ namespace StoreManagementAPI.Data
 
             modelBuilder.Entity<Inventory>()
                 .HasOne(i => i.Product)
-                .WithOne(p => p.Inventory)
-                .HasForeignKey<Inventory>(i => i.ProductId)
+                .WithMany(p => p.Inventories)
+                .HasForeignKey(i => i.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Inventory>()
+                .HasOne(i => i.Warehouse)
+                .WithMany(w => w.Inventories)
+                .HasForeignKey(i => i.WarehouseId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Order>()
                 .HasOne(o => o.Customer)
@@ -91,6 +100,31 @@ namespace StoreManagementAPI.Data
             modelBuilder.Entity<Promotion>()
                 .HasIndex(p => p.PromoCode)
                 .IsUnique();
+
+            // Purchase Orders relationships
+            modelBuilder.Entity<PurchaseOrder>()
+                .HasOne(po => po.Supplier)
+                .WithMany(s => s.PurchaseOrders)
+                .HasForeignKey(po => po.SupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PurchaseOrder>()
+                .HasOne(po => po.User)
+                .WithMany(u => u.PurchaseOrders)
+                .HasForeignKey(po => po.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PurchaseItem>()
+                .HasOne(pi => pi.PurchaseOrder)
+                .WithMany(po => po.PurchaseItems)
+                .HasForeignKey(pi => pi.PurchaseId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PurchaseItem>()
+                .HasOne(pi => pi.Product)
+                .WithMany()
+                .HasForeignKey(pi => pi.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

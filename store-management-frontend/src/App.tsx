@@ -14,10 +14,10 @@ import LoginPage from "./pages/LoginPage";
 import OrdersPage from "./pages/OrdersPage";
 import ProductsPage from "./pages/ProductsPage";
 import PromotionsPage from "./pages/PromotionsPage";
-
-import UsersPage from "./pages/UsersPage";
 import StockReceiptsPage from "./pages/StockReceiptsPage";
 import SuppliersPage from "./pages/SuppliersPage";
+import UsersPage from "./pages/UsersPage";
+import WarehousesPage from "./pages/WarehousesPage";
 
 function App() {
   return (
@@ -55,6 +55,14 @@ function App() {
               }
             />
             <Route
+              path="warehouses"
+              element={
+                <PrivateRoute requireAdmin>
+                  <WarehousesPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
               path="promotions"
               element={
                 <PrivateRoute requireAdmin>
@@ -70,8 +78,8 @@ function App() {
                 </PrivateRoute>
               }
             />
-            <Route path="stock-receipts" element={<StockReceiptsPage />} />
 
+            <Route path="stock-receipts" element={<StockReceiptsPage />} />
           </Route>
         </Routes>
       </Router>

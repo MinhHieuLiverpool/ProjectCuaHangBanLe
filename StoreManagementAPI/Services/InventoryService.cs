@@ -8,6 +8,7 @@ namespace StoreManagementAPI.Services
     public interface IInventoryService
     {
         Task<List<InventoryResponseDto>> GetAllInventory();
+        Task<List<InventoryResponseDto>> GetInventoryByWarehouse(int warehouseId);
         Task<InventoryResponseDto> AddStock(StockReceiptDto dto);
     }
 
@@ -24,6 +25,25 @@ namespace StoreManagementAPI.Services
         {
             var inventories = await _context.Inventories
                 .Include(i => i.Product)
+                .OrderByDescending(i => i.UpdatedAt)
+                .Select(i => new InventoryResponseDto
+                {
+                    InventoryId = i.InventoryId,
+                    ProductId = i.ProductId,
+                    ProductName = i.Product.ProductName,
+                    Quantity = i.Quantity,
+                    UpdatedAt = i.UpdatedAt
+                })
+                .ToListAsync();
+
+            return inventories;
+        }
+
+        public async Task<List<InventoryResponseDto>> GetInventoryByWarehouse(int warehouseId)
+        {
+            var inventories = await _context.Inventories
+                .Include(i => i.Product)
+                .Where(i => i.WarehouseId == warehouseId)
                 .OrderByDescending(i => i.UpdatedAt)
                 .Select(i => new InventoryResponseDto
                 {

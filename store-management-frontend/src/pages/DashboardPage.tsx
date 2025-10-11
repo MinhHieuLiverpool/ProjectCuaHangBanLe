@@ -59,7 +59,7 @@ const DashboardPage: React.FC = () => {
       title: "Tổng tiền",
       dataIndex: "finalAmount",
       key: "finalAmount",
-      render: (amount: number) => `${amount.toLocaleString("vi-VN")}đ`,
+      render: (amount: number) => `${(amount || 0).toLocaleString("vi-VN")}đ`,
     },
     {
       title: "Trạng thái",

@@ -259,25 +259,25 @@ const OrdersPage: React.FC = () => {
       title: "Tổng tiền",
       dataIndex: "totalAmount",
       key: "totalAmount",
-      render: (amount: number) => `${amount.toLocaleString("vi-VN")}đ`,
+      render: (amount: number) => `${(amount || 0).toLocaleString("vi-VN")}đ`,
       sorter: (a: OrderResponse, b: OrderResponse) =>
-        a.totalAmount - b.totalAmount,
+        (a.totalAmount || 0) - (b.totalAmount || 0),
     },
     {
       title: "Giảm giá",
       dataIndex: "discountAmount",
       key: "discountAmount",
-      render: (amount: number) => `${amount.toLocaleString("vi-VN")}đ`,
+      render: (amount: number) => `${(amount || 0).toLocaleString("vi-VN")}đ`,
       sorter: (a: OrderResponse, b: OrderResponse) =>
-        a.discountAmount - b.discountAmount,
+        (a.discountAmount || 0) - (b.discountAmount || 0),
     },
     {
       title: "Thành tiền",
       dataIndex: "finalAmount",
       key: "finalAmount",
-      render: (amount: number) => `${amount.toLocaleString("vi-VN")}đ`,
+      render: (amount: number) => `${(amount || 0).toLocaleString("vi-VN")}đ`,
       sorter: (a: OrderResponse, b: OrderResponse) =>
-        a.finalAmount - b.finalAmount,
+        (a.finalAmount || 0) - (b.finalAmount || 0),
     },
     {
       title: "Trạng thái",
@@ -625,14 +625,14 @@ const OrdersPage: React.FC = () => {
                   dataIndex: "price",
                   key: "price",
                   render: (price: number) =>
-                    `${price.toLocaleString("vi-VN")}đ`,
+                    `${(price || 0).toLocaleString("vi-VN")}đ`,
                 },
                 {
                   title: "Thành tiền",
                   dataIndex: "subtotal",
                   key: "subtotal",
                   render: (price: number) =>
-                    `${price.toLocaleString("vi-VN")}đ`,
+                    `${(price || 0).toLocaleString("vi-VN")}đ`,
                 },
               ]}
               rowKey="productId"
@@ -642,14 +642,16 @@ const OrdersPage: React.FC = () => {
             <Divider />
             <div style={{ textAlign: "right" }}>
               <p>
-                Tổng tiền: {selectedOrder.totalAmount.toLocaleString("vi-VN")}đ
+                Tổng tiền:{" "}
+                {(selectedOrder.totalAmount || 0).toLocaleString("vi-VN")}đ
               </p>
               <p>
                 Giảm giá: -
-                {selectedOrder.discountAmount.toLocaleString("vi-VN")}đ
+                {(selectedOrder.discountAmount || 0).toLocaleString("vi-VN")}đ
               </p>
               <h3>
-                Thành tiền: {selectedOrder.finalAmount.toLocaleString("vi-VN")}đ
+                Thành tiền:{" "}
+                {(selectedOrder.finalAmount || 0).toLocaleString("vi-VN")}đ
               </h3>
             </div>
           </div>
@@ -715,7 +717,7 @@ const OrdersPage: React.FC = () => {
       >
         <p style={{ marginBottom: 16 }}>
           <strong>Số tiền thanh toán:</strong>{" "}
-          {selectedOrder?.finalAmount.toLocaleString("vi-VN")}đ
+          {(selectedOrder?.finalAmount || 0).toLocaleString("vi-VN")}đ
         </p>
         <Form.Item label="Phương thức thanh toán">
           <Select

@@ -1,14 +1,15 @@
-using Microsoft.AspNetCore.Authorization;
+// using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StoreManagementAPI.Models;
 using StoreManagementAPI.Repositories;
 using StoreManagementAPI.Services;
+using System.Security.Claims;
 
 namespace StoreManagementAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "admin")]
+    // [Authorize] - BỎ AUTHENTICATION
     public class PromotionsController : ControllerBase
     {
         private readonly IRepository<Promotion> _promotionRepository;
@@ -22,8 +23,14 @@ namespace StoreManagementAPI.Controllers
             _promotionService = promotionService;
         }
 
+        private int? GetCurrentUserId()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return userIdClaim != null ? int.Parse(userIdClaim) : null;
+        }
+
         [HttpGet]
-        [AllowAnonymous]
+        // [AllowAnonymous] - B? AUTHENTICATION
         public async Task<ActionResult<IEnumerable<Promotion>>> GetAll()
         {
             // Cập nhật trạng thái tất cả promotion trước khi trả về
@@ -34,7 +41,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpGet("active")]
-        [AllowAnonymous]
+        // [AllowAnonymous] - B? AUTHENTICATION
         public async Task<ActionResult<IEnumerable<Promotion>>> GetActive()
         {
             var promotions = await _promotionRepository.FindAsync(p => 
@@ -53,7 +60,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpGet("code/{code}")]
-        [AllowAnonymous]
+        // [AllowAnonymous] - B? AUTHENTICATION
         public async Task<ActionResult<Promotion>> GetByCode(string code)
         {
             var promotions = await _promotionRepository.FindAsync(p => p.PromoCode == code);
@@ -66,6 +73,7 @@ namespace StoreManagementAPI.Controllers
         public async Task<ActionResult<Promotion>> Create([FromBody] Promotion promotion)
         {
             var created = await _promotionRepository.AddAsync(promotion);
+
             return CreatedAtAction(nameof(GetById), new { id = created.PromoId }, created);
         }
 
@@ -86,6 +94,7 @@ namespace StoreManagementAPI.Controllers
             existing.Status = promotion.Status;
 
             var updated = await _promotionRepository.UpdateAsync(existing);
+
             return Ok(updated);
         }
 
@@ -94,6 +103,7 @@ namespace StoreManagementAPI.Controllers
         {
             var result = await _promotionRepository.DeleteAsync(id);
             if (!result) return NotFound();
+
             return Ok(new { message = "Promotion deleted successfully" });
         }
     }

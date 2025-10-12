@@ -10,14 +10,15 @@ import { AuthProvider } from "./context/AuthContext";
 import CategoriesPage from "./pages/CategoriesPage";
 import CustomersPage from "./pages/CustomersPage";
 import DashboardPage from "./pages/DashboardPage";
+import InventoryPage from "./pages/InventoryPage";
 import LoginPage from "./pages/LoginPage";
 import OrdersPage from "./pages/OrdersPage";
+import ProductDetailPage from "./pages/ProductDetailPage";
 import ProductsPage from "./pages/ProductsPage";
 import PromotionsPage from "./pages/PromotionsPage";
 import StockReceiptsPage from "./pages/StockReceiptsPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import UsersPage from "./pages/UsersPage";
-import WarehousesPage from "./pages/WarehousesPage";
 
 function App() {
   return (
@@ -36,6 +37,8 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="products" element={<ProductsPage />} />
+            <Route path="products/:id" element={<ProductDetailPage />} />
+            <Route path="inventory" element={<InventoryPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="customers" element={<CustomersPage />} />
             <Route
@@ -51,14 +54,6 @@ function App() {
               element={
                 <PrivateRoute requireAdmin>
                   <SuppliersPage />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="warehouses"
-              element={
-                <PrivateRoute requireAdmin>
-                  <WarehousesPage />
                 </PrivateRoute>
               }
             />

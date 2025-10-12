@@ -35,6 +35,7 @@ namespace StoreManagementAPI.DTOs
         public string? ProductName { get; set; }
         public string? Barcode { get; set; }
         public decimal? Price { get; set; }
+        public decimal? CostPrice { get; set; }
         public string? Unit { get; set; }
         public string? Status { get; set; } // Thêm Status để có thể ẩn/hiện sản phẩm
     }
@@ -43,5 +44,20 @@ namespace StoreManagementAPI.DTOs
     {
         public int ProductId { get; set; }
         public int Quantity { get; set; }
+    }
+
+    public class ProductHistoryDto
+    {
+        public int Id { get; set; }
+        public string Type { get; set; } = string.Empty; // "purchase" hoặc "sale"
+        public DateTime Date { get; set; }
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string? ReferenceNumber { get; set; } // Mã phiếu nhập/đơn hàng
+        public string? UserName { get; set; }
+        public string? SupplierName { get; set; } // Cho phiếu nhập
+        public string? CustomerName { get; set; } // Cho đơn bán
+        public string? Notes { get; set; }
     }
 }

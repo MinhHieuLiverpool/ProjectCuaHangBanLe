@@ -16,6 +16,7 @@ namespace StoreManagementAPI.Services
         Task<ProductDto?> UpdateProductAsync(int id, UpdateProductDto dto);
         Task<bool> DeleteProductAsync(int id);
         Task<bool> UpdateStockAsync(UpdateStockDto dto);
+        Task<IEnumerable<ProductHistoryDto>> GetProductHistoryAsync(int productId);
     }
 
     public class ProductService : IProductService
@@ -177,11 +178,11 @@ namespace StoreManagementAPI.Services
 
             var createdProduct = await _productRepository.AddAsync(product);
 
-            // Create inventory entry
+            // Tạo inventory với số lượng ban đầu = 0 (sẽ nhập kho sau)
             var inventory = new Inventory
             {
                 ProductId = createdProduct.ProductId,
-                Quantity = dto.InitialStock
+                Quantity = 0 // Sản phẩm mới không có hàng, cần nhập kho
             };
             await _inventoryRepository.AddAsync(inventory);
 
@@ -229,6 +230,7 @@ namespace StoreManagementAPI.Services
             if (!string.IsNullOrEmpty(dto.ProductName)) product.ProductName = dto.ProductName;
             if (dto.Barcode != null) product.Barcode = dto.Barcode;
             if (dto.Price.HasValue) product.Price = dto.Price.Value;
+            if (dto.CostPrice.HasValue) product.CostPrice = dto.CostPrice.Value;
             if (!string.IsNullOrEmpty(dto.Unit)) product.Unit = dto.Unit;
             if (!string.IsNullOrEmpty(dto.Status)) product.Status = dto.Status;
 
@@ -279,6 +281,75 @@ namespace StoreManagementAPI.Services
             }
 
             return true;
+        }
+
+        public async Task<IEnumerable<ProductHistoryDto>> GetProductHistoryAsync(int productId)
+        {
+            var history = new List<ProductHistoryDto>();
+
+            // Lấy lịch sử nhập hàng từ PurchaseOrders
+            var purchaseItems = await _context.PurchaseItems
+                .Include(pi => pi.PurchaseOrder)
+                    .ThenInclude(po => po.Supplier)
+                .Include(pi => pi.PurchaseOrder)
+                    .ThenInclude(po => po.User)
+                .Where(pi => pi.ProductId == productId)
+                .OrderByDescending(pi => pi.PurchaseOrder.PurchaseDate)
+                .ToListAsync();
+
+            foreach (var item in purchaseItems)
+            {
+                history.Add(new ProductHistoryDto
+                {
+                    Id = item.PurchaseOrder.PurchaseId,
+                    Type = "purchase",
+                    Date = item.PurchaseOrder.PurchaseDate,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.CostPrice,
+                    TotalAmount = item.Subtotal,
+                    ReferenceNumber = $"PN{item.PurchaseOrder.PurchaseId:D6}",
+                    UserName = item.PurchaseOrder.User?.FullName,
+                    SupplierName = item.PurchaseOrder.Supplier?.Name,
+                    Notes = null
+                });
+            }
+
+            // Lấy lịch sử bán hàng từ Orders
+            var orderItems = await _context.OrderItems
+                .Include(oi => oi.Order)
+                .Where(oi => oi.ProductId == productId && oi.Order != null)
+                .ToListAsync();
+
+            // Load related data
+            var orderIds = orderItems.Where(oi => oi.Order != null).Select(oi => oi.Order!.OrderId).Distinct().ToList();
+            var orders = await _context.Orders
+                .Include(o => o.Customer)
+                .Include(o => o.User)
+                .Where(o => orderIds.Contains(o.OrderId))
+                .ToDictionaryAsync(o => o.OrderId);
+
+            foreach (var item in orderItems)
+            {
+                if (item.Order == null || !orders.ContainsKey(item.Order.OrderId)) continue;
+                var order = orders[item.Order.OrderId];
+
+                history.Add(new ProductHistoryDto
+                {
+                    Id = order.OrderId,
+                    Type = "sale",
+                    Date = order.OrderDate,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.Price,
+                    TotalAmount = item.Subtotal,
+                    ReferenceNumber = $"DH{order.OrderId:D6}",
+                    UserName = order.User?.FullName,
+                    CustomerName = order.Customer?.Name,
+                    Notes = null
+                });
+            }
+
+            // Sắp xếp theo ngày giảm dần
+            return history.OrderByDescending(h => h.Date);
         }
     }
 }

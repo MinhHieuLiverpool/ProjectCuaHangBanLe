@@ -21,11 +21,6 @@ interface Supplier {
   name: string;
 }
 
-interface Warehouse {
-  warehouseId: number;
-  warehouseName: string;
-}
-
 interface Product {
   productId: number;
   productName: string;
@@ -60,7 +55,6 @@ const StockReceiptsPage: React.FC = () => {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
@@ -70,18 +64,17 @@ const StockReceiptsPage: React.FC = () => {
   );
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
 
+  // Kho mặc định
+  const DEFAULT_WAREHOUSE_ID = 1;
+
   const fetchData = async () => {
     try {
-      const [productsRes, suppliersRes, warehousesRes] = await Promise.all([
+      const [productsRes, suppliersRes] = await Promise.all([
         api.get("/products"),
         api.get("/suppliers"),
-        api.get("/warehouses"),
       ]);
       setProducts(productsRes.data.filter((p: any) => p.status === "active"));
       setSuppliers(suppliersRes.data.filter((s: any) => s.status === "active"));
-      setWarehouses(
-        warehousesRes.data.filter((w: any) => w.status === "active")
-      );
     } catch (error) {
       message.error("Không thể tải dữ liệu");
     }
@@ -126,66 +119,28 @@ const StockReceiptsPage: React.FC = () => {
     // If product changed, fetch its cost price and current stock
     if (field === "productId" && value) {
       const selectedProduct = products.find((p) => p.productId === value);
-      console.log("Selected product:", selectedProduct);
 
       if (selectedProduct) {
         newItems[index].costPrice = selectedProduct.costPrice || 0;
         newItems[index].productName = selectedProduct.productName;
 
-        // Fetch current stock for selected warehouse
-        const warehouseId = form.getFieldValue("warehouseId");
-        console.log("Warehouse ID:", warehouseId);
+        // Fetch current stock từ kho mặc định
+        try {
+          const response = await api.get(
+            `/inventory/warehouse/${DEFAULT_WAREHOUSE_ID}`
+          );
 
-        if (warehouseId) {
-          try {
-            const response = await api.get(
-              `/inventory/warehouse/${warehouseId}`
-            );
-            console.log("Inventory response:", response.data);
-
-            const inventory = response.data.find(
-              (inv: any) => inv.productId === value
-            );
-            newItems[index].currentStock = inventory ? inventory.quantity : 0;
-            console.log("Current stock:", newItems[index].currentStock);
-          } catch (error) {
-            console.error("Error fetching inventory:", error);
-            newItems[index].currentStock = 0;
-          }
-        } else {
-          // If no warehouse selected yet, set stock to 0 and show message
+          const inventory = response.data.find(
+            (inv: any) => inv.productId === value
+          );
+          newItems[index].currentStock = inventory ? inventory.quantity : 0;
+        } catch (error) {
+          console.error("Error fetching inventory:", error);
           newItems[index].currentStock = 0;
-          message.warning("Vui lòng chọn kho trước để xem tồn kho");
         }
       }
     }
 
-    setPurchaseItems(newItems);
-  };
-
-  const handleWarehouseChange = async (warehouseId: number) => {
-    // Update current stock for all items when warehouse changes
-    const newItems = await Promise.all(
-      purchaseItems.map(async (item) => {
-        if (item.productId) {
-          try {
-            const response = await api.get(
-              `/inventory/warehouse/${warehouseId}`
-            );
-            const inventory = response.data.find(
-              (inv: any) => inv.productId === item.productId
-            );
-            return {
-              ...item,
-              currentStock: inventory ? inventory.quantity : 0,
-            };
-          } catch (error) {
-            return { ...item, currentStock: 0 };
-          }
-        }
-        return item;
-      })
-    );
     setPurchaseItems(newItems);
   };
 
@@ -218,23 +173,15 @@ const StockReceiptsPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      // Chỉ gửi các field cần thiết cho backend
-      const itemsToSubmit = purchaseItems.map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        costPrice: item.costPrice,
-      }));
-
       await api.post("/purchaseorders", {
         supplierId: values.supplierId,
-        warehouseId: values.warehouseId,
-        items: itemsToSubmit,
+        warehouseId: DEFAULT_WAREHOUSE_ID, // Sử dụng kho mặc định
+        items: purchaseItems,
       });
       message.success("Tạo phiếu nhập hàng thành công");
       handleCreateModalClose();
       fetchPurchaseOrders();
     } catch (error: any) {
-      console.error("Lỗi tạo phiếu nhập:", error.response?.data);
       message.error(
         error.response?.data?.message || "Không thể tạo phiếu nhập hàng"
       );
@@ -419,25 +366,6 @@ const StockReceiptsPage: React.FC = () => {
               {suppliers.map((s) => (
                 <Select.Option key={s.supplierId} value={s.supplierId}>
                   {s.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            label="Kho nhập"
-            name="warehouseId"
-            rules={[{ required: true, message: "Vui lòng chọn kho" }]}
-          >
-            <Select
-              placeholder="Chọn kho"
-              showSearch
-              optionFilterProp="children"
-              onChange={(value) => handleWarehouseChange(value)}
-            >
-              {warehouses.map((w) => (
-                <Select.Option key={w.warehouseId} value={w.warehouseId}>
-                  {w.warehouseName}
                 </Select.Option>
               ))}
             </Select>

@@ -50,6 +50,14 @@ namespace StoreManagementAPI.Controllers
             return Ok(product);
         }
 
+        [HttpGet("{id}/history")]
+        // // [AllowAnonymous] - B? AUTHENTICATION - BỎ HẾT AUTHENTICATION
+        public async Task<ActionResult<IEnumerable<ProductDto>>> GetProductHistory(int id)
+        {
+            var history = await _productService.GetProductHistoryAsync(id);
+            return Ok(history);
+        }
+
         [HttpGet("barcode/{barcode}")]
         // // [AllowAnonymous] - B? AUTHENTICATION - BỎ HẾT AUTHENTICATION
         public async Task<ActionResult<ProductDto>> GetProductByBarcode(string barcode)

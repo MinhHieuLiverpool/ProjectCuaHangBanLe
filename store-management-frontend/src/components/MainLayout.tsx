@@ -1,8 +1,8 @@
 import { useAuth } from "@/context/AuthContext";
 import {
   AuditOutlined,
+  BarChartOutlined,
   DashboardOutlined,
-  DatabaseOutlined,
   GiftOutlined,
   InboxOutlined,
   LogoutOutlined,
@@ -43,6 +43,11 @@ const MainLayout: React.FC = () => {
       label: "Sản phẩm",
     },
     {
+      key: "/inventory",
+      icon: <BarChartOutlined />,
+      label: "Quản lí tồn kho",
+    },
+    {
       key: "/stock-receipts",
       icon: <InboxOutlined />,
       label: "Nhập hàng",
@@ -68,11 +73,6 @@ const MainLayout: React.FC = () => {
             key: "/suppliers",
             icon: <SubnodeOutlined />,
             label: "Nhà cung cấp",
-          },
-          {
-            key: "/warehouses",
-            icon: <DatabaseOutlined />,
-            label: "Quản lí kho",
           },
           {
             key: "/promotions",

@@ -58,5 +58,33 @@ namespace StoreManagementAPI.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [HttpGet("product/{productId}")]
+        public async Task<ActionResult<InventoryResponseDto>> GetProductInventoryDetail(int productId)
+        {
+            try
+            {
+                var detail = await _inventoryService.GetProductInventoryDetail(productId);
+                return Ok(detail);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("recalculate")]
+        public async Task<ActionResult> RecalculateAllStock()
+        {
+            try
+            {
+                var result = await _inventoryService.RecalculateAllStock();
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi tính toán lại tồn kho", error = ex.Message });
+            }
+        }
     }
 }

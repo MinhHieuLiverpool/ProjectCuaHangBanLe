@@ -27,6 +27,7 @@ export interface Product {
   productName: string;
   barcode?: string;
   price: number;
+  costPrice?: number;
   unit: string;
   status: string; // active || inactive
   stockQuantity?: number;
@@ -38,8 +39,22 @@ export interface CreateProductDto {
   productName: string;
   barcode?: string;
   price: number;
+  costPrice: number;
   unit: string;
-  initialStock: number;
+}
+
+export interface ProductHistory {
+  id: number;
+  type: "purchase" | "sale";
+  date: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  referenceNumber?: string;
+  userName?: string;
+  supplierName?: string;
+  customerName?: string;
+  notes?: string;
 }
 
 export interface Category {
@@ -53,6 +68,13 @@ export interface Supplier {
   phone?: string;
   email?: string;
   address?: string;
+}
+
+export interface Warehouse {
+  warehouseId: number;
+  warehouseName: string;
+  address?: string;
+  status: string;
 }
 
 export interface Customer {

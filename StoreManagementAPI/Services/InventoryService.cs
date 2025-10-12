@@ -30,23 +30,22 @@ namespace StoreManagementAPI.Services
                     .ThenInclude(p => p.Category)
                 .Include(i => i.Warehouse)
                 .OrderByDescending(i => i.UpdatedAt)
-                .Select(i => new InventoryResponseDto
-                {
-                    InventoryId = i.InventoryId,
-                    ProductId = i.ProductId,
-                    ProductName = i.Product.ProductName,
-                    CategoryName = i.Product.Category != null ? i.Product.Category.CategoryName : null,
-                    WarehouseId = i.WarehouseId,
-                    WarehouseName = i.Warehouse != null ? i.Warehouse.WarehouseName : null,
-                    Quantity = i.Quantity,
-                    Unit = i.Product.Unit ?? "Cái",
-                    CostPrice = i.Product.CostPrice,
-                    Price = i.Product.Price,
-                    UpdatedAt = i.UpdatedAt
-                })
                 .ToListAsync();
 
-            return inventories;
+            return inventories.Select(i => new InventoryResponseDto
+            {
+                InventoryId = i.InventoryId,
+                ProductId = i.ProductId,
+                ProductName = i.Product.ProductName,
+                CategoryName = i.Product.Category != null ? i.Product.Category.CategoryName : null,
+                WarehouseId = i.WarehouseId,
+                WarehouseName = i.Warehouse != null ? i.Warehouse.WarehouseName : null,
+                Quantity = i.Quantity,
+                Unit = i.Product.Unit ?? "Cái",
+                CostPrice = i.Product.CostPrice,
+                Price = i.Product.Price,
+                UpdatedAt = i.UpdatedAt
+            }).ToList();
         }
 
         public async Task<List<InventoryResponseDto>> GetInventoryByWarehouse(int warehouseId)

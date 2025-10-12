@@ -8,6 +8,7 @@ import {
   Input,
   message,
   Popconfirm,
+  Tag,
 } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Supplier } from "@/types";
@@ -48,13 +49,37 @@ const SuppliersPage: React.FC = () => {
     setModalVisible(true);
   };
 
+  const handleRestore = async (supplierId: number) => {
+    try {
+      await supplierService.restore(supplierId);
+      message.success("Khôi phục nhà cung cấp thành công!");
+      fetchData();
+    } catch (error: any) {
+      message.error(
+        error.response?.data?.message || "Khôi phục nhà cung cấp thất bại!"
+      );
+    }
+  };
+
   const handleDelete = async (supplierId: number) => {
     try {
-      await supplierService.delete(supplierId);
-      message.success("Xóa nhà cung cấp thành công!");
+      const response = await supplierService.delete(supplierId);
+
+      // Kiểm tra xem có phải soft delete không
+      if (response.softDeleted) {
+        message.warning(
+          response.message ||
+            "Nhà cung cấp có dữ liệu liên quan nên đã được ẩn thay vì xóa"
+        );
+      } else {
+        message.success(response.message || "Xóa nhà cung cấp thành công!");
+      }
+
       fetchData();
-    } catch (error) {
-      message.error("Xóa nhà cung cấp thất bại!");
+    } catch (error: any) {
+      message.error(
+        error.response?.data?.message || "Xóa nhà cung cấp thất bại!"
+      );
     }
   };
 
@@ -103,9 +128,20 @@ const SuppliersPage: React.FC = () => {
       key: "address",
     },
     {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      width: 120,
+      render: (status: string) => (
+        <Tag color={status === "active" ? "green" : "red"}>
+          {status === "active" ? "Hoạt động" : "Đã ẩn"}
+        </Tag>
+      ),
+    },
+    {
       title: "Thao tác",
       key: "action",
-      width: 150,
+      width: 200,
       render: (_: any, record: Supplier) => (
         <Space>
           <Button
@@ -115,14 +151,25 @@ const SuppliersPage: React.FC = () => {
           >
             Sửa
           </Button>
-          <Popconfirm
-            title="Bạn có chắc muốn xóa?"
-            onConfirm={() => handleDelete(record.supplierId)}
-          >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              Xóa
+          {record.status === "inactive" ? (
+            <Button
+              type="link"
+              style={{ color: "green" }}
+              onClick={() => handleRestore(record.supplierId)}
+            >
+              Hiện lại
             </Button>
-          </Popconfirm>
+          ) : (
+            <Popconfirm
+              title="Xóa nhà cung cấp?"
+              description="Nếu có sản phẩm hoặc đơn nhập hàng liên quan, nhà cung cấp sẽ được ẩn thay vì xóa."
+              onConfirm={() => handleDelete(record.supplierId)}
+            >
+              <Button type="link" danger icon={<DeleteOutlined />}>
+                Xóa
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },

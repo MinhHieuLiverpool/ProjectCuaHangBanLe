@@ -22,6 +22,7 @@ namespace StoreManagementAPI.Data
         public DbSet<Warehouse> Warehouses { get; set; }
         public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
         public DbSet<PurchaseItem> PurchaseItems { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -125,6 +126,29 @@ namespace StoreManagementAPI.Data
                 .WithMany()
                 .HasForeignKey(pi => pi.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // AuditLog relationships
+            modelBuilder.Entity<AuditLog>()
+                .HasOne(al => al.User)
+                .WithMany()
+                .HasForeignKey(al => al.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Create indexes for AuditLog for better query performance
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(al => al.UserId);
+
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(al => al.EntityType);
+
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(al => al.EntityId);
+
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(al => al.Action);
+
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(al => al.CreatedAt);
         }
     }
 }

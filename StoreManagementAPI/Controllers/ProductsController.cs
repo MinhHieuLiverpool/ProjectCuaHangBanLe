@@ -105,12 +105,17 @@ namespace StoreManagementAPI.Controllers
         public async Task<ActionResult> DeleteProduct(int id)
         {
             var result = await _productService.DeleteProductAsync(id);
-            if (!result)
+            if (!result.Success)
             {
-                return NotFound(new { message = "Product not found" });
+                return NotFound(new { message = result.Message });
             }
 
-            return Ok(new { message = "Product deleted successfully" });
+            return Ok(new 
+            { 
+                message = result.Message,
+                softDeleted = result.SoftDeleted,
+                productId = id
+            });
         }
 
         [HttpPut("stock")]

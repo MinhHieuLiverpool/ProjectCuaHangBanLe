@@ -17,10 +17,33 @@ namespace StoreManagementAPI.Services
     public class PurchaseOrderService : IPurchaseOrderService
     {
         private readonly StoreDbContext _context;
+        private readonly IAuditLogService _auditLogService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public PurchaseOrderService(StoreDbContext context)
+        public PurchaseOrderService(StoreDbContext context, IAuditLogService auditLogService, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
+            _auditLogService = auditLogService;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        private (int? userId, string? username) GetAuditInfo()
+        {
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext == null)
+                return (1, "admin"); // Default to admin user (id=1)
+
+            var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var usernameClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+
+            int? userId = null;
+            if (int.TryParse(userIdClaim, out int parsedUserId))
+                userId = parsedUserId;
+
+            var username = !string.IsNullOrEmpty(usernameClaim) ? usernameClaim : "admin";
+            var finalUserId = userId ?? 1; // Default to user id = 1 (admin)
+
+            return (finalUserId, username);
         }
 
         public async Task<List<PurchaseOrderResponseDto>> GetAllPurchaseOrders()
@@ -129,6 +152,43 @@ namespace StoreManagementAPI.Services
 
                 await transaction.CommitAsync();
 
+                // Log audit
+                var (auditUserId, auditUsername) = GetAuditInfo();
+                var itemsInfo = dto.Items.Select(i => new
+                {
+                    ProductId = i.ProductId,
+                    Quantity = i.Quantity,
+                    CostPrice = i.CostPrice,
+                    Subtotal = i.Quantity * i.CostPrice
+                }).ToList();
+
+                await _auditLogService.LogActionAsync(
+                    action: "CREATE",
+                    entityType: "PurchaseOrder",
+                    entityId: purchaseOrder.PurchaseId,
+                    entityName: $"PN{purchaseOrder.PurchaseId:D6}",
+                    oldValues: null,
+                    newValues: new
+                    {
+                        PurchaseId = purchaseOrder.PurchaseId,
+                        SupplierId = purchaseOrder.SupplierId,
+                        WarehouseId = purchaseOrder.WarehouseId,
+                        TotalAmount = purchaseOrder.TotalAmount,
+                        Status = purchaseOrder.Status,
+                        ItemCount = dto.Items.Count,
+                        Items = itemsInfo
+                    },
+                    changesSummary: $"Tạo phiếu nhập hàng PN{purchaseOrder.PurchaseId:D6} - Nhà cung cấp ID {purchaseOrder.SupplierId} - Tổng tiền: {totalAmount:N0} VNĐ - {dto.Items.Count} sản phẩm",
+                    userId: auditUserId,
+                    username: auditUsername,
+                    additionalInfo: new Dictionary<string, object>
+                    {
+                        { "ItemCount", dto.Items.Count },
+                        { "WarehouseId", dto.WarehouseId },
+                        { "AutoCompleted", true }
+                    }
+                );
+
                 // Return the created purchase order
                 return (await GetPurchaseOrderById(purchaseOrder.PurchaseId))!;
             }
@@ -151,6 +211,7 @@ namespace StoreManagementAPI.Services
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                var oldStatus = purchaseOrder.Status;
                 purchaseOrder.Status = status;
 
                 // If status is completed, update inventory in the specified warehouse
@@ -184,6 +245,24 @@ namespace StoreManagementAPI.Services
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Log audit
+                var (userId, username) = GetAuditInfo();
+                await _auditLogService.LogActionAsync(
+                    action: "UPDATE",
+                    entityType: "PurchaseOrder",
+                    entityId: purchaseId,
+                    entityName: $"PN{purchaseId:D6}",
+                    oldValues: new { Status = oldStatus },
+                    newValues: new { Status = status },
+                    changesSummary: $"Cập nhật trạng thái phiếu nhập hàng PN{purchaseId:D6}: {oldStatus} → {status}",
+                    userId: userId,
+                    username: username,
+                    additionalInfo: status == "completed" 
+                        ? new Dictionary<string, object> { { "InventoryUpdated", true }, { "ItemCount", purchaseOrder.PurchaseItems.Count } }
+                        : null
+                );
+
                 await transaction.CommitAsync();
 
                 return (await GetPurchaseOrderById(purchaseId))!;
@@ -198,6 +277,7 @@ namespace StoreManagementAPI.Services
         public async Task<bool> DeletePurchaseOrder(int purchaseId)
         {
             var purchaseOrder = await _context.PurchaseOrders
+                .Include(po => po.PurchaseItems)
                 .FirstOrDefaultAsync(po => po.PurchaseId == purchaseId);
 
             if (purchaseOrder == null)
@@ -206,8 +286,33 @@ namespace StoreManagementAPI.Services
             if (purchaseOrder.Status == "completed")
                 throw new Exception("Không thể xóa phiếu nhập đã hoàn thành");
 
+            // Save info for audit log
+            var purchaseInfo = new
+            {
+                PurchaseId = purchaseOrder.PurchaseId,
+                SupplierId = purchaseOrder.SupplierId,
+                TotalAmount = purchaseOrder.TotalAmount,
+                Status = purchaseOrder.Status,
+                ItemCount = purchaseOrder.PurchaseItems.Count
+            };
+
             _context.PurchaseOrders.Remove(purchaseOrder);
             await _context.SaveChangesAsync();
+
+            // Log audit
+            var (userId, username) = GetAuditInfo();
+            await _auditLogService.LogActionAsync(
+                action: "DELETE",
+                entityType: "PurchaseOrder",
+                entityId: purchaseId,
+                entityName: $"PN{purchaseId:D6}",
+                oldValues: purchaseInfo,
+                newValues: null,
+                changesSummary: $"Xóa phiếu nhập hàng PN{purchaseId:D6} - Tổng tiền: {purchaseOrder.TotalAmount:N0} VNĐ",
+                userId: userId,
+                username: username
+            );
+
             return true;
         }
 

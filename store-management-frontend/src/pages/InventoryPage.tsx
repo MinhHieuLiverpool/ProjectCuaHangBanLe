@@ -1,24 +1,13 @@
 import { categoryService } from "@/services/common.service";
 import { Category } from "@/types";
+import AdvancedSearchFilter from "@/components/AdvancedSearchFilter";
 import {
   BarChartOutlined,
   DownloadOutlined,
   EyeOutlined,
-  SearchOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
-import {
-  Button,
-  Card,
-  Col,
-  Input,
-  message,
-  Row,
-  Select,
-  Statistic,
-  Table,
-  Tag,
-} from "antd";
+import { Button, Card, Col, message, Row, Statistic, Table } from "antd";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
@@ -47,6 +36,9 @@ const InventoryPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [searchText, setSearchText] = useState("");
+  const [dateRange, setDateRange] = useState<[string, string] | null>(null);
+  const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
+  const LOW_STOCK_THRESHOLD = 30; // Ngưỡng cảnh báo cố định
 
   useEffect(() => {
     fetchData();
@@ -54,7 +46,7 @@ const InventoryPage: React.FC = () => {
 
   useEffect(() => {
     filterInventories();
-  }, [inventories, selectedCategory, searchText]);
+  }, [inventories, selectedCategory, searchText, dateRange, priceRange]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -94,7 +86,33 @@ const InventoryPage: React.FC = () => {
       );
     }
 
+    // Lọc theo khoảng thời gian (updatedAt)
+    if (dateRange) {
+      const [startDate, endDate] = dateRange;
+      filtered = filtered.filter((item) => {
+        if (!item.updatedAt) return false;
+        const itemDate = new Date(item.updatedAt).toISOString().split("T")[0];
+        return itemDate >= startDate && itemDate <= endDate;
+      });
+    }
+
+    // Lọc theo khoảng giá (giá trị tồn kho)
+    if (priceRange) {
+      const [minPrice, maxPrice] = priceRange;
+      filtered = filtered.filter((item) => {
+        const totalValue = (item.quantity || 0) * (item.costPrice || 0);
+        return totalValue >= minPrice && totalValue <= maxPrice;
+      });
+    }
+
     setFilteredInventories(filtered);
+  };
+
+  const handleResetFilters = () => {
+    setSearchText("");
+    setSelectedCategory(null);
+    setDateRange(null);
+    setPriceRange(null);
   };
 
   const handleExportExcel = () => {
@@ -106,9 +124,7 @@ const InventoryPage: React.FC = () => {
     const excelData = filteredInventories.map((item) => ({
       "Mã SP": item.productId || "",
       "Tên sản phẩm": item.productName || "",
-      "Danh mục": item.categoryName || "",
       "Tồn kho": item.quantity || 0,
-      "Đơn vị": item.unit || "",
       "Giá nhập": item.costPrice || 0,
       "Giá bán": item.price || 0,
       "Giá trị tồn": (item.quantity || 0) * (item.costPrice || 0),
@@ -121,8 +137,6 @@ const InventoryPage: React.FC = () => {
     ws["!cols"] = [
       { wch: 8 },
       { wch: 25 },
-      { wch: 15 },
-      { wch: 10 },
       { wch: 10 },
       { wch: 12 },
       { wch: 12 },
@@ -151,7 +165,8 @@ const InventoryPage: React.FC = () => {
     0
   );
   const lowStockCount = filteredInventories.filter(
-    (item) => (item.quantity || 0) < 10
+    (item) =>
+      (item.quantity || 0) < LOW_STOCK_THRESHOLD && (item.quantity || 0) > 0
   ).length;
   const outOfStockCount = filteredInventories.filter(
     (item) => (item.quantity || 0) === 0
@@ -171,12 +186,6 @@ const InventoryPage: React.FC = () => {
       width: 200,
     },
     {
-      title: "Danh mục",
-      dataIndex: "categoryName",
-      key: "categoryName",
-      width: 120,
-    },
-    {
       title: "Tồn kho",
       dataIndex: "quantity",
       key: "quantity",
@@ -186,20 +195,18 @@ const InventoryPage: React.FC = () => {
         <span
           style={{
             color:
-              quantity === 0 ? "red" : quantity < 10 ? "orange" : "inherit",
-            fontWeight: quantity < 10 ? "bold" : "normal",
+              quantity === 0
+                ? "red"
+                : quantity < LOW_STOCK_THRESHOLD
+                ? "orange"
+                : "inherit",
+            fontWeight: quantity < LOW_STOCK_THRESHOLD ? "bold" : "normal",
           }}
         >
           {quantity}
         </span>
       ),
       sorter: (a: InventoryItem, b: InventoryItem) => a.quantity - b.quantity,
-    },
-    {
-      title: "Đơn vị",
-      dataIndex: "unit",
-      key: "unit",
-      width: 80,
     },
     {
       title: "Giá nhập",
@@ -301,7 +308,7 @@ const InventoryPage: React.FC = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Sản phẩm sắp hết"
+              title="Sản phẩm sắp hết (< 30)"
               value={lowStockCount}
               valueStyle={{ color: "#fa8c16" }}
               prefix={<WarningOutlined />}
@@ -320,40 +327,28 @@ const InventoryPage: React.FC = () => {
         </Col>
       </Row>
 
-      {/* Bộ lọc */}
-      <Card style={{ marginBottom: 16 }}>
-        <Row gutter={16}>
-          <Col span={12}>
-            <Input.Search
-              placeholder="Tìm kiếm sản phẩm, danh mục..."
-              allowClear
-              enterButton={<SearchOutlined />}
-              size="large"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-            />
-          </Col>
-          <Col span={12}>
-            <Select
-              placeholder="Lọc theo danh mục"
-              allowClear
-              size="large"
-              style={{ width: "100%" }}
-              value={selectedCategory}
-              onChange={setSelectedCategory}
-            >
-              {categories.map((category) => (
-                <Select.Option
-                  key={category.categoryId}
-                  value={category.categoryId}
-                >
-                  {category.categoryName}
-                </Select.Option>
-              ))}
-            </Select>
-          </Col>
-        </Row>
-      </Card>
+      {/* Bộ lọc nâng cao */}
+      <AdvancedSearchFilter
+        searchText={searchText}
+        onSearchChange={setSearchText}
+        searchPlaceholder="Tìm kiếm sản phẩm..."
+        categories={categories.map((c) => ({
+          id: c.categoryId,
+          name: c.categoryName,
+        }))}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+        categoryLabel="Danh mục"
+        showDateFilter={true}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        dateLabel="Thời gian cập nhật"
+        showPriceFilter={true}
+        priceRange={priceRange}
+        onPriceRangeChange={setPriceRange}
+        priceLabel="Giá trị tồn"
+        onReset={handleResetFilters}
+      />
 
       {/* Bảng tồn kho */}
       <Table

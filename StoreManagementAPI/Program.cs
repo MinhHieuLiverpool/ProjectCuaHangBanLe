@@ -33,6 +33,10 @@ builder.Services.AddScoped<IPromotionService, PromotionService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+
+// Add HttpContextAccessor for getting HTTP context in services
+builder.Services.AddHttpContextAccessor();
 
 // Configure Swagger - Bỏ JWT authentication
 builder.Services.AddEndpointsApiExplorer();

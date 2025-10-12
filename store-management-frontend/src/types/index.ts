@@ -60,6 +60,7 @@ export interface ProductHistory {
 export interface Category {
   categoryId: number;
   categoryName: string;
+  status: string; // "active" | "inactive"
 }
 
 export interface Supplier {
@@ -68,6 +69,7 @@ export interface Supplier {
   phone?: string;
   email?: string;
   address?: string;
+  status: string; // "active" | "inactive"
 }
 
 export interface Warehouse {

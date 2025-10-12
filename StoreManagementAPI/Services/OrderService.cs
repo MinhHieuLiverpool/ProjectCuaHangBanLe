@@ -24,6 +24,8 @@ namespace StoreManagementAPI.Services
         private readonly IRepository<Payment> _paymentRepository;
         private readonly IRepository<Inventory> _inventoryRepository;
         private readonly IRepository<Promotion> _promotionRepository;
+        private readonly IAuditLogService _auditLogService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public OrderService(
             StoreDbContext context,
@@ -31,7 +33,9 @@ namespace StoreManagementAPI.Services
             IRepository<OrderItem> orderItemRepository,
             IRepository<Payment> paymentRepository,
             IRepository<Inventory> inventoryRepository,
-            IRepository<Promotion> promotionRepository)
+            IRepository<Promotion> promotionRepository,
+            IAuditLogService auditLogService,
+            IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _orderRepository = orderRepository;
@@ -39,6 +43,27 @@ namespace StoreManagementAPI.Services
             _paymentRepository = paymentRepository;
             _inventoryRepository = inventoryRepository;
             _promotionRepository = promotionRepository;
+            _auditLogService = auditLogService;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        private (int? userId, string? username) GetAuditInfo()
+        {
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext == null)
+                return (1, "admin");
+
+            var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var usernameClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+
+            int? userId = null;
+            if (int.TryParse(userIdClaim, out int parsedUserId))
+                userId = parsedUserId;
+
+            var username = !string.IsNullOrEmpty(usernameClaim) ? usernameClaim : "admin";
+            var finalUserId = userId ?? 1;
+
+            return (finalUserId, username);
         }
 
         public async Task<OrderResponseDto?> CreateOrderAsync(CreateOrderDto dto, string? ipAddress = null)
@@ -167,8 +192,41 @@ namespace StoreManagementAPI.Services
 
                 await _context.SaveChangesAsync();
 
-                // Audit log được xử lý ở Controller
-                await _context.SaveChangesAsync();
+                // Log audit
+                var (auditUserId, auditUsername) = GetAuditInfo();
+                var itemsInfo = orderItems.Select(oi => new
+                {
+                    ProductId = oi.ProductId,
+                    Quantity = oi.Quantity,
+                    Price = oi.Price,
+                    Subtotal = oi.Subtotal
+                }).ToList();
+
+                await _auditLogService.LogActionAsync(
+                    action: "CREATE",
+                    entityType: "Order",
+                    entityId: createdOrder.OrderId,
+                    entityName: $"DH{createdOrder.OrderId:D6}",
+                    oldValues: null,
+                    newValues: new
+                    {
+                        OrderId = createdOrder.OrderId,
+                        CustomerId = createdOrder.CustomerId,
+                        TotalAmount = createdOrder.TotalAmount,
+                        DiscountAmount = createdOrder.DiscountAmount,
+                        Status = createdOrder.Status,
+                        ItemCount = orderItems.Count,
+                        Items = itemsInfo
+                    },
+                    changesSummary: $"Tạo đơn hàng DH{createdOrder.OrderId:D6} - Khách hàng ID {createdOrder.CustomerId} - Tổng tiền: {createdOrder.TotalAmount:N0} VNĐ - {orderItems.Count} sản phẩm",
+                    userId: auditUserId,
+                    username: auditUsername,
+                    additionalInfo: new Dictionary<string, object>
+                    {
+                        { "ItemCount", orderItems.Count },
+                        { "HasPromotion", createdOrder.PromoId.HasValue }
+                    }
+                );
 
                 await transaction.CommitAsync();
 
@@ -261,8 +319,24 @@ namespace StoreManagementAPI.Services
             var order = await _orderRepository.GetByIdAsync(orderId);
             if (order == null) return false;
 
+            var oldStatus = order.Status;
             order.Status = status;
             await _orderRepository.UpdateAsync(order);
+
+            // Log audit
+            var (userId, username) = GetAuditInfo();
+            await _auditLogService.LogActionAsync(
+                action: "UPDATE",
+                entityType: "Order",
+                entityId: orderId,
+                entityName: $"DH{orderId:D6}",
+                oldValues: new { Status = oldStatus },
+                newValues: new { Status = status },
+                changesSummary: $"Cập nhật trạng thái đơn hàng DH{orderId:D6}: {oldStatus} → {status}",
+                userId: userId,
+                username: username
+            );
+
             return true;
         }
 
@@ -282,8 +356,28 @@ namespace StoreManagementAPI.Services
             await _paymentRepository.AddAsync(payment);
 
             // Update order status
+            var oldStatus = order.Status;
             order.Status = "paid";
             await _orderRepository.UpdateAsync(order);
+
+            // Log audit
+            var (userId, username) = GetAuditInfo();
+            await _auditLogService.LogActionAsync(
+                action: "PAYMENT",
+                entityType: "Order",
+                entityId: dto.OrderId,
+                entityName: $"DH{dto.OrderId:D6}",
+                oldValues: new { Status = oldStatus, PaidAmount = 0 },
+                newValues: new { Status = "paid", PaidAmount = dto.Amount },
+                changesSummary: $"Thanh toán đơn hàng DH{dto.OrderId:D6} - Số tiền: {dto.Amount:N0} VNĐ - Phương thức: {dto.PaymentMethod}",
+                userId: userId,
+                username: username,
+                additionalInfo: new Dictionary<string, object>
+                {
+                    { "PaymentMethod", dto.PaymentMethod },
+                    { "Amount", dto.Amount }
+                }
+            );
 
             return true;
         }

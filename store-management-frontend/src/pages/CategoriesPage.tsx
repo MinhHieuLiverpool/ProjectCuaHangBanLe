@@ -8,6 +8,7 @@ import {
   Input,
   message,
   Popconfirm,
+  Tag,
 } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Category } from "@/types";
@@ -48,13 +49,35 @@ const CategoriesPage: React.FC = () => {
     setModalVisible(true);
   };
 
+  const handleRestore = async (categoryId: number) => {
+    try {
+      await categoryService.restore(categoryId);
+      message.success("Khôi phục danh mục thành công!");
+      fetchData();
+    } catch (error: any) {
+      message.error(
+        error.response?.data?.message || "Khôi phục danh mục thất bại!"
+      );
+    }
+  };
+
   const handleDelete = async (categoryId: number) => {
     try {
-      await categoryService.delete(categoryId);
-      message.success("Xóa danh mục thành công!");
+      const response = await categoryService.delete(categoryId);
+
+      // Kiểm tra xem có phải soft delete không
+      if (response.softDeleted) {
+        message.warning(
+          response.message ||
+            "Danh mục có sản phẩm liên quan nên đã được ẩn thay vì xóa"
+        );
+      } else {
+        message.success(response.message || "Xóa danh mục thành công!");
+      }
+
       fetchData();
-    } catch (error) {
-      message.error("Xóa danh mục thất bại!");
+    } catch (error: any) {
+      message.error(error.response?.data?.message || "Xóa danh mục thất bại!");
     }
   };
 
@@ -88,9 +111,20 @@ const CategoriesPage: React.FC = () => {
       key: "categoryName",
     },
     {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      width: 120,
+      render: (status: string) => (
+        <Tag color={status === "active" ? "green" : "red"}>
+          {status === "active" ? "Hoạt động" : "Đã ẩn"}
+        </Tag>
+      ),
+    },
+    {
       title: "Thao tác",
       key: "action",
-      width: 150,
+      width: 200,
       render: (_: any, record: Category) => (
         <Space>
           <Button
@@ -100,14 +134,25 @@ const CategoriesPage: React.FC = () => {
           >
             Sửa
           </Button>
-          <Popconfirm
-            title="Bạn có chắc muốn xóa?"
-            onConfirm={() => handleDelete(record.categoryId)}
-          >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              Xóa
+          {record.status === "inactive" ? (
+            <Button
+              type="link"
+              style={{ color: "green" }}
+              onClick={() => handleRestore(record.categoryId)}
+            >
+              Hiện lại
             </Button>
-          </Popconfirm>
+          ) : (
+            <Popconfirm
+              title="Xóa danh mục?"
+              description="Nếu có sản phẩm liên quan, danh mục sẽ được ẩn thay vì xóa."
+              onConfirm={() => handleDelete(record.categoryId)}
+            >
+              <Button type="link" danger icon={<DeleteOutlined />}>
+                Xóa
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },

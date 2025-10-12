@@ -1,5 +1,7 @@
 // using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using StoreManagementAPI.Data;
 using StoreManagementAPI.Models;
 using StoreManagementAPI.Repositories;
 
@@ -11,10 +13,12 @@ namespace StoreManagementAPI.Controllers
     public class CategoriesController : ControllerBase
     {
         private readonly IRepository<Category> _categoryRepository;
+        private readonly StoreDbContext _context;
 
-        public CategoriesController(IRepository<Category> categoryRepository)
+        public CategoriesController(IRepository<Category> categoryRepository, StoreDbContext context)
         {
             _categoryRepository = categoryRepository;
+            _context = context;
         }
 
         [HttpGet]
@@ -55,13 +59,57 @@ namespace StoreManagementAPI.Controllers
             return Ok(updated);
         }
 
+        [HttpPatch("{id}/restore")]
+        // [Authorize] - B? AUTHENTICATION // Chỉ admin mới được khôi phục
+        public async Task<ActionResult> Restore(int id)
+        {
+            var category = await _categoryRepository.GetByIdAsync(id);
+            if (category == null) return NotFound();
+
+            category.Status = "active";
+            var updated = await _categoryRepository.UpdateAsync(category);
+            return Ok(new 
+            { 
+                message = "Khôi phục danh mục thành công",
+                category = updated
+            });
+        }
+
         [HttpDelete("{id}")]
         // [Authorize] - B? AUTHENTICATION // Chỉ admin mới được xóa
         public async Task<ActionResult> Delete(int id)
         {
-            var result = await _categoryRepository.DeleteAsync(id);
-            if (!result) return NotFound();
-            return Ok(new { message = "Category deleted successfully" });
+            var category = await _categoryRepository.GetByIdAsync(id);
+            if (category == null) return NotFound();
+
+            // Kiểm tra xem có sản phẩm nào đang sử dụng category này không
+            var hasProducts = await _context.Products
+                .AnyAsync(p => p.CategoryId == id && p.Status != "deleted");
+
+            if (hasProducts)
+            {
+                // Có sản phẩm liên quan -> chỉ ẩn đi (soft delete)
+                category.Status = "inactive";
+                await _categoryRepository.UpdateAsync(category);
+                return Ok(new 
+                { 
+                    message = "Danh mục có sản phẩm liên quan nên đã được ẩn thay vì xóa",
+                    softDeleted = true,
+                    categoryId = id
+                });
+            }
+            else
+            {
+                // Không có sản phẩm liên quan -> xóa hẳn
+                var result = await _categoryRepository.DeleteAsync(id);
+                if (!result) return NotFound();
+                return Ok(new 
+                { 
+                    message = "Đã xóa danh mục thành công",
+                    softDeleted = false,
+                    categoryId = id
+                });
+            }
         }
     }
 }

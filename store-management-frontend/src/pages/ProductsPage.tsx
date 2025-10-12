@@ -1,6 +1,7 @@
 ﻿import { categoryService, supplierService } from "@/services/common.service";
 import { productService } from "@/services/product.service";
 import { Category, Product, Supplier } from "@/types";
+import AdvancedSearchFilter from "@/components/AdvancedSearchFilter";
 import {
   BarChartOutlined,
   DeleteOutlined,
@@ -8,7 +9,6 @@ import {
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
-  SearchOutlined,
 } from "@ant-design/icons";
 import {
   Button,
@@ -33,32 +33,51 @@ import * as XLSX from "xlsx";
 const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]); // Tất cả categories (cho filter)
+  const [activeCategories, setActiveCategories] = useState<Category[]>([]); // Chỉ active (cho form)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]); // Tất cả suppliers (cho filter)
+  const [activeSuppliers, setActiveSuppliers] = useState<Supplier[]>([]); // Chỉ active (cho form)
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [searchText, setSearchText] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
+  const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    filterProducts();
+  }, [products, searchText, selectedCategory, selectedSupplier, priceRange]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [productsData, categoriesData, suppliersData] = await Promise.all([
+      const [
+        productsData,
+        categoriesData,
+        suppliersData,
+        activeCategoriesData,
+        activeSuppliersData,
+      ] = await Promise.all([
         productService.getAll(),
-        categoryService.getAll(),
-        supplierService.getAll(),
+        categoryService.getAll(), // Tất cả cho filter
+        supplierService.getAll(), // Tất cả cho filter
+        categoryService.getActive(), // Chỉ active cho form
+        supplierService.getActive(), // Chỉ active cho form
       ]);
       setProducts(productsData);
       setFilteredProducts(productsData);
       setCategories(categoriesData);
       setSuppliers(suppliersData);
+      setActiveCategories(activeCategoriesData);
+      setActiveSuppliers(activeSuppliersData);
     } catch (error) {
       message.error("Không thể tải dữ liệu!");
     } finally {
@@ -66,21 +85,41 @@ const ProductsPage: React.FC = () => {
     }
   };
 
-  const handleSearch = async (value: string) => {
-    setSearchText(value);
-    setLoading(true);
-    try {
-      if (value.trim() === "") {
-        setFilteredProducts(products);
-      } else {
-        const results = await productService.search(value);
-        setFilteredProducts(results);
-      }
-    } catch (error) {
-      message.error("Lỗi khi tìm kiếm!");
-    } finally {
-      setLoading(false);
+  const filterProducts = () => {
+    let filtered = [...products];
+
+    // Filter by search text
+    if (searchText.trim()) {
+      const search = searchText.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.productName.toLowerCase().includes(search) ||
+          p.barcode?.toLowerCase().includes(search) ||
+          p.categoryName?.toLowerCase().includes(search) ||
+          p.supplierName?.toLowerCase().includes(search)
+      );
     }
+
+    // Filter by category
+    if (selectedCategory) {
+      filtered = filtered.filter((p) => p.categoryId === selectedCategory);
+    }
+
+    // Filter by supplier
+    if (selectedSupplier) {
+      filtered = filtered.filter((p) => p.supplierId === selectedSupplier);
+    }
+
+    // Filter by price range
+    if (priceRange) {
+      const [minPrice, maxPrice] = priceRange;
+      filtered = filtered.filter((p) => {
+        const price = p.price || 0;
+        return price >= minPrice && price <= maxPrice;
+      });
+    }
+
+    setFilteredProducts(filtered);
   };
 
   const handleCreate = () => {
@@ -162,13 +201,29 @@ const ProductsPage: React.FC = () => {
     message.success(`Đã xuất ${filteredProducts.length} sản phẩm ra Excel!`);
   };
 
-  const handleDelete = async (productId: number) => {
+  const handleResetFilters = () => {
+    setSearchText("");
+    setSelectedCategory(null);
+    setSelectedSupplier(null);
+    setPriceRange(null);
+  };
+
+  const handleDelete = async (id: number) => {
     try {
-      await productService.delete(productId);
-      message.success("Xóa sản phẩm thành công!");
+      const response = await productService.delete(id);
+
+      // Kiểm tra xem có phải soft delete không
+      if (response.softDeleted) {
+        message.warning(
+          response.message || "Sản phẩm đã được bán nên đã được ẩn thay vì xóa"
+        );
+      } else {
+        message.success(response.message || "Xóa sản phẩm thành công!");
+      }
+
       fetchData();
-    } catch (error) {
-      message.error("Xóa sản phẩm thất bại!");
+    } catch (error: any) {
+      message.error(error.response?.data?.message || "Xóa sản phẩm thất bại!");
     }
   };
 
@@ -377,27 +432,43 @@ const ProductsPage: React.FC = () => {
         </Space>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <Input.Search
-          placeholder="Tìm kiếm theo tên, mã vạch, danh mục hoặc nhà cung cấp..."
-          allowClear
-          enterButton={
-            <>
-              <SearchOutlined /> Tìm kiếm
-            </>
-          }
-          size="large"
-          onSearch={handleSearch}
-          onChange={(e) => {
-            setSearchText(e.target.value);
-            if (e.target.value === "") {
-              handleSearch("");
-            }
-          }}
-          value={searchText}
-          style={{ maxWidth: 600 }}
-        />
-      </div>
+      {/* Bộ lọc nâng cao */}
+      <AdvancedSearchFilter
+        searchText={searchText}
+        onSearchChange={setSearchText}
+        searchPlaceholder="Tìm kiếm theo tên, mã vạch..."
+        categories={categories.map((c) => ({
+          id: c.categoryId,
+          name: c.categoryName,
+        }))}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+        categoryLabel="Danh mục"
+        showPriceFilter={true}
+        priceRange={priceRange}
+        onPriceRangeChange={setPriceRange}
+        priceLabel="Giá bán"
+        onReset={handleResetFilters}
+      >
+        <Col xs={24} sm={12} md={8}>
+          <Select
+            placeholder="Nhà cung cấp"
+            allowClear
+            style={{ width: "100%" }}
+            value={selectedSupplier}
+            onChange={setSelectedSupplier}
+          >
+            {suppliers.map((supplier) => (
+              <Select.Option
+                key={supplier.supplierId}
+                value={supplier.supplierId}
+              >
+                {supplier.name}
+              </Select.Option>
+            ))}
+          </Select>
+        </Col>
+      </AdvancedSearchFilter>
 
       <Table
         columns={columns}
@@ -450,7 +521,7 @@ const ProductsPage: React.FC = () => {
                 rules={[{ required: true, message: "Vui lòng chọn danh mục!" }]}
               >
                 <Select placeholder="Chọn danh mục">
-                  {categories.map((cat) => (
+                  {activeCategories.map((cat) => (
                     <Select.Option key={cat.categoryId} value={cat.categoryId}>
                       {cat.categoryName}
                     </Select.Option>
@@ -467,7 +538,7 @@ const ProductsPage: React.FC = () => {
                 ]}
               >
                 <Select placeholder="Chọn nhà cung cấp">
-                  {suppliers.map((sup) => (
+                  {activeSuppliers.map((sup) => (
                     <Select.Option key={sup.supplierId} value={sup.supplierId}>
                       {sup.name}
                     </Select.Option>

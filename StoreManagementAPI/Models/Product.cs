@@ -40,8 +40,22 @@ namespace StoreManagementAPI.Models
         [StringLength(20)]
         public string Status { get; set; } = "active"; // active, inactive, deleted
 
+        [Column("description")]
+        public string? Description { get; set; } // Có sẵn trong DB
+
+        [Column("image_url")]
+        [StringLength(255)]
+        public string? ImageUrl { get; set; } // Có sẵn trong DB
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        [Column("updated_at")]
+        public DateTime? UpdatedAt { get; set; } // Có sẵn trong DB
+
+        // ⭐ CỘT MỚI - Demo Migration Tự Động
+        [Column("is_featured")]
+        public bool IsFeatured { get; set; } = false; // Sản phẩm nổi bật
 
         // Navigation properties
         [ForeignKey("CategoryId")]

@@ -63,6 +63,24 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Auto-apply pending migrations in Development (Best Practice)
+if (app.Environment.IsDevelopment())
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<StoreDbContext>();
+        try
+        {
+            db.Database.Migrate(); // Tự động chạy migrations khi start
+            Console.WriteLine("✅ Database migrations applied successfully!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Migration error: {ex.Message}");
+        }
+    }
+}
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {

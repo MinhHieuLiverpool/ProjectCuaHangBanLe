@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+// using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StoreManagementAPI.Models;
 using StoreManagementAPI.Services;
@@ -6,7 +6,7 @@ using StoreManagementAPI.DTOs;
 
 namespace StoreManagementAPI.Controllers
 {
-    [Authorize]
+    // [Authorize] - B? AUTHENTICATION
     [Route("api/[Controller]")]
     [ApiController]
     public class UsersController : ControllerBase
@@ -18,7 +18,7 @@ namespace StoreManagementAPI.Controllers
             _authService = authService;
         }
 
-        [Authorize(Roles = "admin")]
+        // [Authorize] - B? AUTHENTICATION
         [HttpGet]
         public async Task<ActionResult<IEnumerable<User>>> GetUsers()
         {
@@ -26,7 +26,7 @@ namespace StoreManagementAPI.Controllers
             return Ok(users);
         }
 
-        [Authorize(Roles = "admin")]
+        // [Authorize] - B? AUTHENTICATION
         [HttpPost]
         public async Task<ActionResult<User>> CreateUser([FromBody] RegisterDto registerDto)
         {
@@ -39,7 +39,7 @@ namespace StoreManagementAPI.Controllers
             return CreatedAtAction(nameof(GetUsers), new { id = user.UserId }, user);
         }
 
-        [Authorize(Roles = "admin")]
+        // [Authorize] - B? AUTHENTICATION
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto updateDto)
         {
@@ -52,7 +52,7 @@ namespace StoreManagementAPI.Controllers
             return NoContent();
         }
 
-        [Authorize(Roles = "admin")]
+        // [Authorize] - B? AUTHENTICATION
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(int id)
         {
@@ -65,7 +65,7 @@ namespace StoreManagementAPI.Controllers
             return NoContent();
         }
 
-        [Authorize(Roles = "admin")]
+        // [Authorize] - B? AUTHENTICATION
         [HttpPut("{id}/password")]
         public async Task<IActionResult> UpdatePassword(int id, [FromBody] UpdatePasswordDto dto)
         {

@@ -18,12 +18,7 @@ export const authService = {
   },
 
   logout() {
-    localStorage.removeItem("token");
     localStorage.removeItem("user");
-  },
-
-  getToken(): string | null {
-    return localStorage.getItem("token");
   },
 
   getCurrentUser() {
@@ -31,8 +26,7 @@ export const authService = {
     return userStr ? JSON.parse(userStr) : null;
   },
 
-  saveAuth(token: string, user: LoginResponse) {
-    localStorage.setItem("token", token);
+  saveAuth(user: LoginResponse) {
     localStorage.setItem("user", JSON.stringify(user));
   },
 };

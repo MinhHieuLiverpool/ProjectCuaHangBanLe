@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: store_mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: store_management
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./00-init-charset.sql:/docker-entrypoint-initdb.d/00-init-charset.sql
+      - ./store_management.sql:/docker-entrypoint-initdb.d/01-store_management.sql
+      - ./mysql-init.cnf:/etc/mysql/conf.d/mysql-init.cnf:ro
+    networks:
+      - store_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./StoreManagementAPI
+      dockerfile: Dockerfile
+    container_name: store_api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5122
+      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=store_management;User=root;Password=;CharSet=utf8mb4;
+    ports:
+      - "5122:5122"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - store_network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./store-management-frontend
+      dockerfile: Dockerfile
+    container_name: store_frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    networks:
+      - store_network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  store_network:
+    driver: bridge

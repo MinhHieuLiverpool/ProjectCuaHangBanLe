@@ -26,6 +26,10 @@ namespace StoreManagementAPI.Models
         [Column("address")]
         public string? Address { get; set; }
 
+        [Column("status")]
+        [StringLength(20)]
+        public string Status { get; set; } = "active"; // active, inactive, deleted
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 

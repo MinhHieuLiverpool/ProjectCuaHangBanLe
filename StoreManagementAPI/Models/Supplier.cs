@@ -26,7 +26,12 @@ namespace StoreManagementAPI.Models
         [Column("address")]
         public string? Address { get; set; }
 
-        // Navigation property
+        [Column("status")]
+        [StringLength(20)]
+        public string Status { get; set; } = "active"; // active, inactive, deleted
+
+        // Navigation properties
         public virtual ICollection<Product> Products { get; set; } = new List<Product>();
+        public virtual ICollection<PurchaseOrder> PurchaseOrders { get; set; } = new List<PurchaseOrder>();
     }
 }

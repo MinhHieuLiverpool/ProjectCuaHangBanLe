@@ -12,7 +12,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
   children,
   requireAdmin = false,
 }) => {
-  const { isAuthenticated, isAdmin, loading } = useAuth();
+  const { isAdmin, loading } = useAuth();
 
   if (loading) {
     return (
@@ -29,10 +29,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
     );
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
+  // Bỏ authentication check - cho phép truy cập tất cả
   if (requireAdmin && !isAdmin) {
     return <Navigate to="/" replace />;
   }

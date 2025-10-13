@@ -1,13 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StoreManagementAPI.DTOs;
 using StoreManagementAPI.Services;
+using System.Security.Claims;
 
 namespace StoreManagementAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    // // [Authorize] - BỎ AUTHENTICATION
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _productService;
@@ -17,8 +17,14 @@ namespace StoreManagementAPI.Controllers
             _productService = productService;
         }
 
+        private int? GetCurrentUserId()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return userIdClaim != null ? int.Parse(userIdClaim) : null;
+        }
+
         [HttpGet]
-        [AllowAnonymous]
+        // // [AllowAnonymous] - B? AUTHENTICATION - BỎ HẾT AUTHENTICATION
         public async Task<ActionResult<IEnumerable<ProductDto>>> GetAllProducts()
         {
             var products = await _productService.GetAllProductsAsync();
@@ -26,7 +32,7 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpGet("search")]
-        [AllowAnonymous]
+        // // [AllowAnonymous] - B? AUTHENTICATION - BỎ HẾT AUTHENTICATION
         public async Task<ActionResult<IEnumerable<ProductDto>>> SearchProducts([FromQuery] string searchTerm)
         {
             var products = await _productService.SearchProductsAsync(searchTerm);
@@ -44,8 +50,16 @@ namespace StoreManagementAPI.Controllers
             return Ok(product);
         }
 
+        [HttpGet("{id}/history")]
+        // // [AllowAnonymous] - B? AUTHENTICATION - BỎ HẾT AUTHENTICATION
+        public async Task<ActionResult<IEnumerable<ProductDto>>> GetProductHistory(int id)
+        {
+            var history = await _productService.GetProductHistoryAsync(id);
+            return Ok(history);
+        }
+
         [HttpGet("barcode/{barcode}")]
-        [AllowAnonymous]
+        // // [AllowAnonymous] - B? AUTHENTICATION - BỎ HẾT AUTHENTICATION
         public async Task<ActionResult<ProductDto>> GetProductByBarcode(string barcode)
         {
             var product = await _productService.GetProductByBarcodeAsync(barcode);
@@ -57,12 +71,13 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "admin")]
+        // // [Authorize] - BỎ AUTHENTICATION
         public async Task<ActionResult<ProductDto>> CreateProduct([FromBody] CreateProductDto dto)
         {
             try
             {
                 var product = await _productService.CreateProductAsync(dto);
+
                 return CreatedAtAction(nameof(GetProduct), new { id = product.ProductId }, product);
             }
             catch (Exception ex)
@@ -72,31 +87,39 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = "admin")]
+        // // [Authorize] - BỎ AUTHENTICATION
         public async Task<ActionResult<ProductDto>> UpdateProduct(int id, [FromBody] UpdateProductDto dto)
         {
             var product = await _productService.UpdateProductAsync(id, dto);
+            
             if (product == null)
             {
                 return NotFound(new { message = "Product not found" });
             }
+
             return Ok(product);
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Roles = "admin")]
+        // // [Authorize] - BỎ AUTHENTICATION
         public async Task<ActionResult> DeleteProduct(int id)
         {
             var result = await _productService.DeleteProductAsync(id);
-            if (!result)
+            if (!result.Success)
             {
-                return NotFound(new { message = "Product not found" });
+                return NotFound(new { message = result.Message });
             }
-            return Ok(new { message = "Product deleted successfully" });
+
+            return Ok(new 
+            { 
+                message = result.Message,
+                softDeleted = result.SoftDeleted,
+                productId = id
+            });
         }
 
         [HttpPut("stock")]
-        [Authorize(Roles = "admin,staff")]
+        // // [Authorize] - B? AUTHENTICATION - BỎ HẾT AUTHENTICATION
         public async Task<ActionResult> UpdateStock([FromBody] UpdateStockDto dto)
         {
             try

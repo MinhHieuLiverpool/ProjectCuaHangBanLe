@@ -14,14 +14,20 @@ namespace StoreManagementAPI.Models
         [Column("product_id")]
         public int ProductId { get; set; }
 
+        [Column("warehouse_id")]
+        public int? WarehouseId { get; set; }
+
         [Column("quantity")]
         public int Quantity { get; set; } = 0;
 
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
-        // Navigation property
+        // Navigation properties
         [ForeignKey("ProductId")]
         public virtual Product Product { get; set; } = null!;
+
+        [ForeignKey("WarehouseId")]
+        public virtual Warehouse? Warehouse { get; set; }
     }
 }

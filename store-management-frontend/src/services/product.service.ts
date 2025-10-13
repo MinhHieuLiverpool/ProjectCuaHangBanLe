@@ -1,6 +1,11 @@
 import { CreateProductDto, Product } from "@/types";
 import apiClient from "./api";
 
+interface DeleteResponse {
+  message: string;
+  softDeleted: boolean;
+}
+
 export const productService = {
   async getAll(): Promise<Product[]> {
     const response = await apiClient.get<Product[]>("/products");
@@ -36,8 +41,9 @@ export const productService = {
     return response.data;
   },
 
-  async delete(id: number): Promise<void> {
-    await apiClient.delete(`/products/${id}`);
+  async delete(id: number): Promise<DeleteResponse> {
+    const response = await apiClient.delete<DeleteResponse>(`/products/${id}`);
+    return response.data;
   },
 
   async updateStock(productId: number, quantity: number): Promise<void> {

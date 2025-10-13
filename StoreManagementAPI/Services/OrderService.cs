@@ -3,12 +3,13 @@ using StoreManagementAPI.Data;
 using StoreManagementAPI.DTOs;
 using StoreManagementAPI.Models;
 using StoreManagementAPI.Repositories;
+using System.Text.Json;
 
 namespace StoreManagementAPI.Services
 {
     public interface IOrderService
     {
-        Task<OrderResponseDto?> CreateOrderAsync(CreateOrderDto dto);
+        Task<OrderResponseDto?> CreateOrderAsync(CreateOrderDto dto, string? ipAddress = null);
         Task<OrderResponseDto?> GetOrderByIdAsync(int id);
         Task<IEnumerable<OrderResponseDto>> GetAllOrdersAsync();
         Task<bool> UpdateOrderStatusAsync(int orderId, string status);
@@ -23,6 +24,8 @@ namespace StoreManagementAPI.Services
         private readonly IRepository<Payment> _paymentRepository;
         private readonly IRepository<Inventory> _inventoryRepository;
         private readonly IRepository<Promotion> _promotionRepository;
+        private readonly IAuditLogService _auditLogService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public OrderService(
             StoreDbContext context,
@@ -30,7 +33,9 @@ namespace StoreManagementAPI.Services
             IRepository<OrderItem> orderItemRepository,
             IRepository<Payment> paymentRepository,
             IRepository<Inventory> inventoryRepository,
-            IRepository<Promotion> promotionRepository)
+            IRepository<Promotion> promotionRepository,
+            IAuditLogService auditLogService,
+            IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _orderRepository = orderRepository;
@@ -38,18 +43,57 @@ namespace StoreManagementAPI.Services
             _paymentRepository = paymentRepository;
             _inventoryRepository = inventoryRepository;
             _promotionRepository = promotionRepository;
+            _auditLogService = auditLogService;
+            _httpContextAccessor = httpContextAccessor;
         }
 
-        public async Task<OrderResponseDto?> CreateOrderAsync(CreateOrderDto dto)
+        private (int? userId, string? username) GetAuditInfo()
+        {
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext == null)
+                return (1, "admin");
+
+            var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var usernameClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+
+            int? userId = null;
+            if (int.TryParse(userIdClaim, out int parsedUserId))
+                userId = parsedUserId;
+
+            var username = !string.IsNullOrEmpty(usernameClaim) ? usernameClaim : "admin";
+            var finalUserId = userId ?? 1;
+
+            return (finalUserId, username);
+        }
+
+        public async Task<OrderResponseDto?> CreateOrderAsync(CreateOrderDto dto, string? ipAddress = null)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                // Ensure userId exists in database, otherwise set to null
+                int? userId = null;
+                if (dto.UserId.HasValue)
+                {
+                    var userExists = await _context.Users.AnyAsync(u => u.UserId == dto.UserId.Value);
+                    if (userExists)
+                    {
+                        userId = dto.UserId.Value;
+                    }
+                }
+                
+                // If still null, try to find a default user
+                if (!userId.HasValue)
+                {
+                    var defaultUser = await _context.Users.FirstOrDefaultAsync();
+                    userId = defaultUser?.UserId;
+                }
+
                 // Create order
                 var order = new Order
                 {
                     CustomerId = dto.CustomerId,
-                    UserId = dto.UserId,
+                    UserId = userId, // Can be null
                     Status = "pending",
                     OrderDate = DateTime.Now
                 };
@@ -63,13 +107,14 @@ namespace StoreManagementAPI.Services
                     var product = await _context.Products.FindAsync(item.ProductId);
                     if (product == null) continue;
 
-                    // Check inventory
-                    var inventory = await _context.Inventories
-                        .FirstOrDefaultAsync(i => i.ProductId == item.ProductId);
+                    // Check total inventory across all warehouses
+                    var totalInventory = await _context.Inventories
+                        .Where(i => i.ProductId == item.ProductId)
+                        .SumAsync(i => i.Quantity);
                     
-                    if (inventory == null || inventory.Quantity < item.Quantity)
+                    if (totalInventory < item.Quantity)
                     {
-                        throw new Exception($"Insufficient stock for product {product.ProductName}");
+                        throw new Exception($"Insufficient stock for product {product.ProductName}. Available: {totalInventory}, Requested: {item.Quantity}");
                     }
 
                     var subtotal = product.Price * item.Quantity;
@@ -84,9 +129,22 @@ namespace StoreManagementAPI.Services
                     };
                     orderItems.Add(orderItem);
 
-                    // Update inventory
-                    inventory.Quantity -= item.Quantity;
-                    inventory.UpdatedAt = DateTime.Now;
+                    // Update inventory - deduct from warehouses with stock (FIFO approach)
+                    var inventories = await _context.Inventories
+                        .Where(i => i.ProductId == item.ProductId && i.Quantity > 0)
+                        .OrderBy(i => i.WarehouseId) // Ưu tiên kho theo thứ tự ID
+                        .ToListAsync();
+                    
+                    int remainingQuantity = item.Quantity;
+                    foreach (var inv in inventories)
+                    {
+                        if (remainingQuantity <= 0) break;
+                        
+                        int deductQuantity = Math.Min(inv.Quantity, remainingQuantity);
+                        inv.Quantity -= deductQuantity;
+                        inv.UpdatedAt = DateTime.Now;
+                        remainingQuantity -= deductQuantity;
+                    }
                 }
 
                 order.TotalAmount = totalAmount;
@@ -133,6 +191,43 @@ namespace StoreManagementAPI.Services
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Log audit
+                var (auditUserId, auditUsername) = GetAuditInfo();
+                var itemsInfo = orderItems.Select(oi => new
+                {
+                    ProductId = oi.ProductId,
+                    Quantity = oi.Quantity,
+                    Price = oi.Price,
+                    Subtotal = oi.Subtotal
+                }).ToList();
+
+                await _auditLogService.LogActionAsync(
+                    action: "CREATE",
+                    entityType: "Order",
+                    entityId: createdOrder.OrderId,
+                    entityName: $"DH{createdOrder.OrderId:D6}",
+                    oldValues: null,
+                    newValues: new
+                    {
+                        OrderId = createdOrder.OrderId,
+                        CustomerId = createdOrder.CustomerId,
+                        TotalAmount = createdOrder.TotalAmount,
+                        DiscountAmount = createdOrder.DiscountAmount,
+                        Status = createdOrder.Status,
+                        ItemCount = orderItems.Count,
+                        Items = itemsInfo
+                    },
+                    changesSummary: $"Tạo đơn hàng DH{createdOrder.OrderId:D6} - Khách hàng ID {createdOrder.CustomerId} - Tổng tiền: {createdOrder.TotalAmount:N0} VNĐ - {orderItems.Count} sản phẩm",
+                    userId: auditUserId,
+                    username: auditUsername,
+                    additionalInfo: new Dictionary<string, object>
+                    {
+                        { "ItemCount", orderItems.Count },
+                        { "HasPromotion", createdOrder.PromoId.HasValue }
+                    }
+                );
+
                 await transaction.CommitAsync();
 
                 return await GetOrderByIdAsync(createdOrder.OrderId);
@@ -224,8 +319,24 @@ namespace StoreManagementAPI.Services
             var order = await _orderRepository.GetByIdAsync(orderId);
             if (order == null) return false;
 
+            var oldStatus = order.Status;
             order.Status = status;
             await _orderRepository.UpdateAsync(order);
+
+            // Log audit
+            var (userId, username) = GetAuditInfo();
+            await _auditLogService.LogActionAsync(
+                action: "UPDATE",
+                entityType: "Order",
+                entityId: orderId,
+                entityName: $"DH{orderId:D6}",
+                oldValues: new { Status = oldStatus },
+                newValues: new { Status = status },
+                changesSummary: $"Cập nhật trạng thái đơn hàng DH{orderId:D6}: {oldStatus} → {status}",
+                userId: userId,
+                username: username
+            );
+
             return true;
         }
 
@@ -245,8 +356,28 @@ namespace StoreManagementAPI.Services
             await _paymentRepository.AddAsync(payment);
 
             // Update order status
+            var oldStatus = order.Status;
             order.Status = "paid";
             await _orderRepository.UpdateAsync(order);
+
+            // Log audit
+            var (userId, username) = GetAuditInfo();
+            await _auditLogService.LogActionAsync(
+                action: "PAYMENT",
+                entityType: "Order",
+                entityId: dto.OrderId,
+                entityName: $"DH{dto.OrderId:D6}",
+                oldValues: new { Status = oldStatus, PaidAmount = 0 },
+                newValues: new { Status = "paid", PaidAmount = dto.Amount },
+                changesSummary: $"Thanh toán đơn hàng DH{dto.OrderId:D6} - Số tiền: {dto.Amount:N0} VNĐ - Phương thức: {dto.PaymentMethod}",
+                userId: userId,
+                username: username,
+                additionalInfo: new Dictionary<string, object>
+                {
+                    { "PaymentMethod", dto.PaymentMethod },
+                    { "Amount", dto.Amount }
+                }
+            );
 
             return true;
         }

@@ -1,6 +1,11 @@
 import apiClient from "./api";
 import { Customer, Category, Supplier, Promotion } from "@/types";
 
+interface DeleteResponse {
+  message: string;
+  softDeleted: boolean;
+}
+
 export const customerService = {
   async getAll(): Promise<Customer[]> {
     const response = await apiClient.get<Customer[]>("/customers");
@@ -26,6 +31,10 @@ export const categoryService = {
     const response = await apiClient.get<Category[]>("/categories");
     return response.data;
   },
+  async getActive(): Promise<Category[]> {
+    const response = await apiClient.get<Category[]>("/categories");
+    return response.data.filter((c) => c.status === "active");
+  },
   async create(data: Omit<Category, "categoryId">): Promise<Category> {
     const response = await apiClient.post<Category>("/categories", data);
     return response.data;
@@ -34,8 +43,14 @@ export const categoryService = {
     const response = await apiClient.put<Category>(`/categories/${id}`, data);
     return response.data;
   },
-  async delete(id: number): Promise<void> {
-    await apiClient.delete(`/categories/${id}`);
+  async restore(id: number): Promise<void> {
+    await apiClient.patch(`/categories/${id}/restore`);
+  },
+  async delete(id: number): Promise<DeleteResponse> {
+    const response = await apiClient.delete<DeleteResponse>(
+      `/categories/${id}`
+    );
+    return response.data;
   },
 };
 
@@ -43,6 +58,10 @@ export const supplierService = {
   async getAll(): Promise<Supplier[]> {
     const response = await apiClient.get<Supplier[]>("/suppliers");
     return response.data;
+  },
+  async getActive(): Promise<Supplier[]> {
+    const response = await apiClient.get<Supplier[]>("/suppliers");
+    return response.data.filter((s) => s.status === "active");
   },
   async create(data: Omit<Supplier, "supplierId">): Promise<Supplier> {
     const response = await apiClient.post<Supplier>("/suppliers", data);
@@ -52,8 +71,12 @@ export const supplierService = {
     const response = await apiClient.put<Supplier>(`/suppliers/${id}`, data);
     return response.data;
   },
-  async delete(id: number): Promise<void> {
-    await apiClient.delete(`/suppliers/${id}`);
+  async restore(id: number): Promise<void> {
+    await apiClient.patch(`/suppliers/${id}/restore`);
+  },
+  async delete(id: number): Promise<DeleteResponse> {
+    const response = await apiClient.delete<DeleteResponse>(`/suppliers/${id}`);
+    return response.data;
   },
 };
 

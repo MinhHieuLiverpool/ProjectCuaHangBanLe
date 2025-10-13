@@ -15,6 +15,10 @@ namespace StoreManagementAPI.Models
         [StringLength(100)]
         public string CategoryName { get; set; } = string.Empty;
 
+        [Column("status")]
+        [StringLength(20)]
+        public string Status { get; set; } = "active"; // active, inactive, deleted
+
         // Navigation property
         public virtual ICollection<Product> Products { get; set; } = new List<Product>();
     }

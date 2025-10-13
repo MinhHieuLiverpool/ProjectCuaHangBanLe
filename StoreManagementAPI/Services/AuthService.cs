@@ -16,7 +16,7 @@ namespace StoreManagementAPI.Services
         Task<IEnumerable<User>> GetUsersAsync();
         Task<bool> UpdateUserAsync(int id, UpdateUserDto updateDto);
         Task<bool> DeleteUserAsync(int id);
-        Task<bool> UpdatePasswordAsync(int userId, string newPassword);
+        Task<bool> UpdatePasswordAsync(int userId, string OldPassword, string newPassword);
     }
 
     public class AuthService : IAuthService
@@ -53,6 +53,18 @@ namespace StoreManagementAPI.Services
 
         public async Task<User?> RegisterAsync(RegisterDto registerDto)
         {
+            // Nếu user muốn tạo admin, kiểm tra có admin chưa
+            if (registerDto.Role == "admin")
+            {
+                var hasAdmin = await _userRepository.ExistsAsync(u => u.Role == "admin");
+                if (hasAdmin)
+                    throw new Exception("Only one admin account is allowed.");
+            }
+
+            // Nếu không chỉ định role, mặc định là staff
+            if (string.IsNullOrEmpty(registerDto.Role))
+                registerDto.Role = "staff";
+            
             var exists = await _userRepository.ExistsAsync(u => u.Username == registerDto.Username);
             if (exists)
             {
@@ -110,7 +122,7 @@ namespace StoreManagementAPI.Services
             if (!string.IsNullOrEmpty(updateDto.FullName))
                 user.FullName = updateDto.FullName;
 
-            if (!string.IsNullOrEmpty(updateDto.Role))
+            if (!string.IsNullOrEmpty(updateDto.Role)&& user.Role != "admin")
                 user.Role = updateDto.Role;
 
             await _userRepository.UpdateAsync(user);
@@ -129,6 +141,10 @@ namespace StoreManagementAPI.Services
 
             if (user == null)
                 return false;
+                
+             // Kiểm tra mật khẩu cũ
+            if (user.Password != oldPassword)
+                throw new Exception("Old password is incorrect.");
 
             user.Password = newPassword; 
             await _userRepository.UpdateAsync(user);

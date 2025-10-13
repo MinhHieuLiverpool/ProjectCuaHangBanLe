@@ -17,6 +17,7 @@ namespace StoreManagementAPI.Services
         Task<bool> UpdateUserAsync(int id, UpdateUserDto updateDto);
         Task<bool> DeleteUserAsync(int id);
         Task<bool> UpdatePasswordAsync(int userId, string OldPassword, string newPassword);
+        Task<bool> ToggleUserStatusAsync(int userId);
     }
 
     public class AuthService : IAuthService
@@ -38,6 +39,12 @@ namespace StoreManagementAPI.Services
             if (user == null || user.Password != loginDto.Password)
             {
                 return null;
+            }
+
+            // Kiểm tra tài khoản có bị khóa không
+            if (user.Status != "active")
+            {
+                throw new Exception("Account is locked. Please contact administrator.");
             }
 
             var token = GenerateJwtToken(user);
@@ -116,14 +123,12 @@ namespace StoreManagementAPI.Services
             var user = users.FirstOrDefault();
             if (user == null) return false;
 
+          
             if (!string.IsNullOrEmpty(updateDto.Password))
                 user.Password = updateDto.Password; 
 
             if (!string.IsNullOrEmpty(updateDto.FullName))
                 user.FullName = updateDto.FullName;
-
-            if (!string.IsNullOrEmpty(updateDto.Role)&& user.Role != "admin")
-                user.Role = updateDto.Role;
 
             await _userRepository.UpdateAsync(user);
             return true;
@@ -134,7 +139,7 @@ namespace StoreManagementAPI.Services
             return await _userRepository.DeleteAsync(id);
         }
 
-        public async Task<bool> UpdatePasswordAsync(int userId, string newPassword)
+        public async Task<bool> UpdatePasswordAsync(int userId, string oldPassword, string newPassword)
         {
             var users = await _userRepository.FindAsync(u => u.UserId == userId);
             var user = users.FirstOrDefault();
@@ -147,6 +152,26 @@ namespace StoreManagementAPI.Services
                 throw new Exception("Old password is incorrect.");
 
             user.Password = newPassword; 
+            await _userRepository.UpdateAsync(user);
+            return true;
+        }
+
+        public async Task<bool> ToggleUserStatusAsync(int userId)
+        {
+            var users = await _userRepository.FindAsync(u => u.UserId == userId);
+            var user = users.FirstOrDefault();
+
+            if (user == null)
+                return false;
+
+            // Không cho phép khóa admin ID = 1
+            if (user.UserId == 1 && user.Role == "admin")
+            {
+                throw new Exception("Cannot lock the primary admin account (ID = 1)");
+            }
+
+            // Toggle status giữa active và inactive
+            user.Status = user.Status == "active" ? "inactive" : "active";
             await _userRepository.UpdateAsync(user);
             return true;
         }

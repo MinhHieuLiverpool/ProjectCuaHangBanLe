@@ -22,10 +22,16 @@ export const userService = {
     return response.data;
   },
 
-  updatePassword: async (userId: number, newPassword: string) => {
+  updatePassword: async (userId: number, oldPassword: string, newPassword: string) => {
     const response = await apiClient.put(`/users/${userId}/password`, {
-    password: newPassword,
-  });
+      oldPassword: oldPassword,
+      newPassword: newPassword,
+    });
+    return response.data;
+  },
+
+  toggleUserStatus: async (userId: number) => {
+    const response = await apiClient.put(`/users/${userId}/toggle-status`);
     return response.data;
   },
 };

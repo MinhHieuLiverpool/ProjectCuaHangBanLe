@@ -43,13 +43,20 @@ namespace StoreManagementAPI.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto updateDto)
         {
-            var result = await _authService.UpdateUserAsync(id, updateDto);
-            if (!result)
+            try
             {
-                return NotFound(new { message = "User not found" });
-            }
+                var result = await _authService.UpdateUserAsync(id, updateDto);
+                if (!result)
+                {
+                    return NotFound(new { message = "User not found" });
+                }
 
-            return NoContent();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         // [Authorize] - B? AUTHENTICATION
@@ -69,13 +76,40 @@ namespace StoreManagementAPI.Controllers
         [HttpPut("{id}/password")]
         public async Task<IActionResult> UpdatePassword(int id, [FromBody] UpdatePasswordDto dto)
         {
-            var result = await _authService.UpdatePasswordAsync(id, dto.Password);
-            if (!result)
+            try
             {
-                return NotFound(new { message = "User not found or update failed" });
-            }
+                var result = await _authService.UpdatePasswordAsync(id, dto.OldPassword, dto.NewPassword);
+                if (!result)
+                {
+                    return NotFound(new { message = "User not found or update failed" });
+                }
 
-            return Ok(new { message = "Password updated successfully" });
+                return Ok(new { message = "Password updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // [Authorize] - B? AUTHENTICATION
+        [HttpPut("{id}/toggle-status")]
+        public async Task<IActionResult> ToggleUserStatus(int id)
+        {
+            try
+            {
+                var result = await _authService.ToggleUserStatusAsync(id);
+                if (!result)
+                {
+                    return NotFound(new { message = "User not found" });
+                }
+
+                return Ok(new { message = "User status updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }

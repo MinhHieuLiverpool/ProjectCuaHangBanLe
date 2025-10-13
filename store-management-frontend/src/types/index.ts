@@ -3,6 +3,7 @@ export interface User {
   username: string;
   fullName: string;
   role: "admin" | "staff";
+  status: "active" | "inactive";
 }
 
 export interface LoginRequest {

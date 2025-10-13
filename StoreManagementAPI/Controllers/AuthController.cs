@@ -18,13 +18,20 @@ namespace StoreManagementAPI.Controllers
         [HttpPost("login")]
         public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginDto loginDto)
         {
-            var result = await _authService.LoginAsync(loginDto);
-            if (result == null)
+            try
             {
-                return Unauthorized(new { message = "Invalid username or password" });
-            }
+                var result = await _authService.LoginAsync(loginDto);
+                if (result == null)
+                {
+                    return Unauthorized(new { message = "Invalid username or password" });
+                }
 
-            return Ok(result);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
         }
 
         [HttpPost("register")]

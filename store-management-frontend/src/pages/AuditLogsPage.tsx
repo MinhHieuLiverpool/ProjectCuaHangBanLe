@@ -470,14 +470,6 @@ const AuditLogsPage: React.FC = () => {
               <Descriptions.Item label="User ID" span={1}>
                 {selectedLog.userId || "N/A"}
               </Descriptions.Item>
-              <Descriptions.Item label="IP Address" span={2}>
-                {selectedLog.ipAddress || "N/A"}
-              </Descriptions.Item>
-              <Descriptions.Item label="User Agent" span={2}>
-                <Typography.Text ellipsis style={{ maxWidth: 700 }}>
-                  {selectedLog.userAgent || "N/A"}
-                </Typography.Text>
-              </Descriptions.Item>
               <Descriptions.Item label="Mô tả thay đổi" span={2}>
                 {selectedLog.changesSummary || "N/A"}
               </Descriptions.Item>

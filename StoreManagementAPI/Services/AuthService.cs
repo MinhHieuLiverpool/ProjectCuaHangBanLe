@@ -23,11 +23,13 @@ namespace StoreManagementAPI.Services
     {
         private readonly IRepository<User> _userRepository;
         private readonly IConfiguration _configuration;
+        private readonly IAuditLogService _auditLogService;
 
-        public AuthService(IRepository<User> userRepository, IConfiguration configuration)
+        public AuthService(IRepository<User> userRepository, IConfiguration configuration, IAuditLogService auditLogService)
         {
             _userRepository = userRepository;
             _configuration = configuration;
+            _auditLogService = auditLogService;
         }
 
         public async Task<LoginResponseDto?> LoginAsync(LoginDto loginDto)
@@ -37,10 +39,45 @@ namespace StoreManagementAPI.Services
 
             if (user == null || user.Password != loginDto.Password)
             {
+                // Log failed login attempt
+                await _auditLogService.LogActionAsync(
+                    action: "LOGIN_FAILED",
+                    entityType: "User",
+                    entityId: null,
+                    entityName: loginDto.Username,
+                    oldValues: null,
+                    newValues: null,
+                    changesSummary: $"Đăng nhập thất bại cho tài khoản '{loginDto.Username}'",
+                    userId: null,
+                    username: loginDto.Username,
+                    additionalInfo: new Dictionary<string, object>
+                    {
+                        { "Reason", user == null ? "Tài khoản không tồn tại" : "Sai mật khẩu" },
+                        { "AttemptTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }
+                    }
+                );
                 return null;
             }
 
             var token = GenerateJwtToken(user);
+
+            // Log successful login
+            await _auditLogService.LogActionAsync(
+                action: "LOGIN",
+                entityType: "User",
+                entityId: user.UserId,
+                entityName: user.FullName ?? user.Username,
+                oldValues: null,
+                newValues: null,
+                changesSummary: $"Người dùng '{user.Username}' ({user.FullName}) đăng nhập thành công",
+                userId: user.UserId,
+                username: user.Username,
+                additionalInfo: new Dictionary<string, object>
+                {
+                    { "Role", user.Role },
+                    { "LoginTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }
+                }
+            );
 
             return new LoginResponseDto
             {
@@ -56,6 +93,23 @@ namespace StoreManagementAPI.Services
             var exists = await _userRepository.ExistsAsync(u => u.Username == registerDto.Username);
             if (exists)
             {
+                // Log failed registration attempt
+                await _auditLogService.LogActionAsync(
+                    action: "REGISTER_FAILED",
+                    entityType: "User",
+                    entityId: null,
+                    entityName: registerDto.Username,
+                    oldValues: null,
+                    newValues: null,
+                    changesSummary: $"Đăng ký thất bại: Tài khoản '{registerDto.Username}' đã tồn tại",
+                    userId: null,
+                    username: "system",
+                    additionalInfo: new Dictionary<string, object>
+                    {
+                        { "Reason", "Username already exists" },
+                        { "AttemptTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }
+                    }
+                );
                 return null;
             }
 
@@ -67,7 +121,31 @@ namespace StoreManagementAPI.Services
                 Role = registerDto.Role
             };
 
-            return await _userRepository.AddAsync(user);
+            var newUser = await _userRepository.AddAsync(user);
+
+            // Log successful registration
+            await _auditLogService.LogActionAsync(
+                action: "REGISTER",
+                entityType: "User",
+                entityId: newUser.UserId,
+                entityName: newUser.FullName ?? newUser.Username,
+                oldValues: null,
+                newValues: new
+                {
+                    Username = newUser.Username,
+                    FullName = newUser.FullName,
+                    Role = newUser.Role
+                },
+                changesSummary: $"Đăng ký tài khoản mới: '{newUser.Username}' ({newUser.FullName}) với vai trò {newUser.Role}",
+                userId: newUser.UserId,
+                username: newUser.Username,
+                additionalInfo: new Dictionary<string, object>
+                {
+                    { "RegisterTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }
+                }
+            );
+
+            return newUser;
         }
 
         public string GenerateJwtToken(User user)

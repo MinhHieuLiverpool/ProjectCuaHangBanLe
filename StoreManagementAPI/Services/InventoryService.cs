@@ -43,6 +43,7 @@ namespace StoreManagementAPI.Services
                 Unit = i.Product.Unit ?? "Cái",
                 CostPrice = i.Product.CostPrice,
                 Price = i.Product.Price,
+                UpdatedAt = i.UpdatedAt
             }).ToList();
         }
 
@@ -57,6 +58,7 @@ namespace StoreManagementAPI.Services
                     ProductId = i.ProductId,
                     ProductName = i.Product.ProductName,
                     Quantity = i.Quantity,
+                    UpdatedAt = i.UpdatedAt
                 })
                 .ToListAsync();
 
@@ -88,6 +90,7 @@ namespace StoreManagementAPI.Services
                 {
                     ProductId = dto.ProductId,
                     Quantity = dto.Quantity,
+                    UpdatedAt = DateTime.Now
                 };
                 _context.Inventories.Add(inventory);
             }
@@ -95,6 +98,7 @@ namespace StoreManagementAPI.Services
             {
                 // Update existing inventory
                 inventory.Quantity += dto.Quantity;
+                inventory.UpdatedAt = DateTime.Now;
             }
 
             await _context.SaveChangesAsync();
@@ -110,6 +114,7 @@ namespace StoreManagementAPI.Services
                 ProductId = updatedInventory.ProductId,
                 ProductName = updatedInventory.Product.ProductName,
                 Quantity = updatedInventory.Quantity,
+                UpdatedAt = updatedInventory.UpdatedAt
             };
         }
 
@@ -155,6 +160,19 @@ namespace StoreManagementAPI.Services
 
         public async Task<RecalculateStockResponseDto> RecalculateAllStock()
         {
+            // ==========================================
+            // TẠM THỜI TẮT CHỨC NĂNG TỰ ĐỘNG TÍNH TOÁN
+            // Để debug và tìm điểm leak số lượng
+            // ==========================================
+            return new RecalculateStockResponseDto
+            {
+                Message = "⚠️ Chức năng tự động tính toán đã bị TẮT để debug. Vui lòng bật lại sau khi hoàn thành!",
+                TotalProductsUpdated = 0,
+                TotalWarehousesUpdated = 0,
+                Details = new List<string> { "Chức năng đã bị vô hiệu hóa tạm thời" }
+            };
+
+            /* COMMENTED OUT - Uncomment để bật lại
             var details = new List<string>();
             var productsUpdated = 0;
             var warehousesUpdated = 0;
@@ -188,12 +206,14 @@ namespace StoreManagementAPI.Services
                         ProductId = product.ProductId,
                         Quantity = calculatedStock,
                         WarehouseId = null,
+                        UpdatedAt = DateTime.Now
                     };
                     _context.Inventories.Add(inventory);
                 }
                 else
                 {
                     inventory.Quantity = calculatedStock;
+                    inventory.UpdatedAt = DateTime.Now;
                 }
 
                 productsUpdated++;
@@ -209,6 +229,7 @@ namespace StoreManagementAPI.Services
                 TotalWarehousesUpdated = warehousesUpdated,
                 Details = details
             };
+            */
         }
     }
 }

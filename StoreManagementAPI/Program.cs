@@ -63,7 +63,10 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Auto-apply pending migrations in Development (Best Practice)
+// ⚠️ AUTO-MIGRATION & SEEDING ĐÃ BỊ TẮT
+// Database được setup bằng SQL script thủ công (store_management.sql)
+// Nếu cần chạy lại: Xóa database và chạy file SQL
+/*
 if (app.Environment.IsDevelopment())
 {
     using (var scope = app.Services.CreateScope())
@@ -73,6 +76,7 @@ if (app.Environment.IsDevelopment())
         {
             db.Database.Migrate(); // Tự động chạy migrations khi start
             Console.WriteLine("✅ Database migrations applied successfully!");
+            await DbSeeder.SeedDatabase(db, app.Environment);
         }
         catch (Exception ex)
         {
@@ -80,6 +84,7 @@ if (app.Environment.IsDevelopment())
         }
     }
 }
+*/
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())

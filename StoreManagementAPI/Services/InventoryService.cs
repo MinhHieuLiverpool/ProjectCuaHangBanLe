@@ -29,7 +29,6 @@ namespace StoreManagementAPI.Services
                 .Include(i => i.Product)
                     .ThenInclude(p => p.Category)
                 .Include(i => i.Warehouse)
-                .OrderByDescending(i => i.UpdatedAt)
                 .ToListAsync();
 
             return inventories.Select(i => new InventoryResponseDto
@@ -44,7 +43,6 @@ namespace StoreManagementAPI.Services
                 Unit = i.Product.Unit ?? "Cái",
                 CostPrice = i.Product.CostPrice,
                 Price = i.Product.Price,
-                UpdatedAt = i.UpdatedAt
             }).ToList();
         }
 
@@ -53,14 +51,12 @@ namespace StoreManagementAPI.Services
             var inventories = await _context.Inventories
                 .Include(i => i.Product)
                 .Where(i => i.WarehouseId == warehouseId)
-                .OrderByDescending(i => i.UpdatedAt)
                 .Select(i => new InventoryResponseDto
                 {
                     InventoryId = i.InventoryId,
                     ProductId = i.ProductId,
                     ProductName = i.Product.ProductName,
                     Quantity = i.Quantity,
-                    UpdatedAt = i.UpdatedAt
                 })
                 .ToListAsync();
 
@@ -92,7 +88,6 @@ namespace StoreManagementAPI.Services
                 {
                     ProductId = dto.ProductId,
                     Quantity = dto.Quantity,
-                    UpdatedAt = DateTime.Now
                 };
                 _context.Inventories.Add(inventory);
             }
@@ -100,7 +95,6 @@ namespace StoreManagementAPI.Services
             {
                 // Update existing inventory
                 inventory.Quantity += dto.Quantity;
-                inventory.UpdatedAt = DateTime.Now;
             }
 
             await _context.SaveChangesAsync();
@@ -116,7 +110,6 @@ namespace StoreManagementAPI.Services
                 ProductId = updatedInventory.ProductId,
                 ProductName = updatedInventory.Product.ProductName,
                 Quantity = updatedInventory.Quantity,
-                UpdatedAt = updatedInventory.UpdatedAt
             };
         }
 
@@ -195,14 +188,12 @@ namespace StoreManagementAPI.Services
                         ProductId = product.ProductId,
                         Quantity = calculatedStock,
                         WarehouseId = null,
-                        UpdatedAt = DateTime.Now
                     };
                     _context.Inventories.Add(inventory);
                 }
                 else
                 {
                     inventory.Quantity = calculatedStock;
-                    inventory.UpdatedAt = DateTime.Now;
                 }
 
                 productsUpdated++;

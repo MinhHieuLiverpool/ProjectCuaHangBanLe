@@ -53,10 +53,6 @@ namespace StoreManagementAPI.Models
         [Column("updated_at")]
         public DateTime? UpdatedAt { get; set; } // Có sẵn trong DB
 
-        // ⭐ CỘT MỚI - Demo Migration Tự Động
-        [Column("is_featured")]
-        public bool IsFeatured { get; set; } = false; // Sản phẩm nổi bật
-
         // Navigation properties
         [ForeignKey("CategoryId")]
         public virtual Category? Category { get; set; }

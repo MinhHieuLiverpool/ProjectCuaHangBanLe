@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using StoreManagementAPI.Data;
 using StoreManagementAPI.Models;
 using StoreManagementAPI.Repositories;
+using System.Text.Json;
 
 namespace StoreManagementAPI.Controllers
 {
@@ -19,6 +20,26 @@ namespace StoreManagementAPI.Controllers
         {
             _supplierRepository = supplierRepository;
             _context = context;
+        }
+
+        private void LogAudit(string action, string entity, int? entityId, string? entityName, string changesSummary, object? oldValues, object? newValues)
+        {
+            var auditLog = new AuditLog
+            {
+                Action = action,
+                EntityType = entity,
+                EntityId = entityId,
+                EntityName = entityName,
+                ChangesSummary = changesSummary,
+                OldValues = oldValues != null ? JsonSerializer.Serialize(oldValues) : null,
+                NewValues = newValues != null ? JsonSerializer.Serialize(newValues) : null,
+                CreatedAt = DateTime.Now,
+                UserId = 1,
+                Username = "admin"
+            };
+
+            _context.AuditLogs.Add(auditLog);
+            _context.SaveChanges();
         }
 
         [HttpGet]
@@ -43,6 +64,26 @@ namespace StoreManagementAPI.Controllers
         public async Task<ActionResult<Supplier>> Create([FromBody] Supplier supplier)
         {
             var created = await _supplierRepository.AddAsync(supplier);
+            
+            // Log audit
+            LogAudit(
+                action: "CREATE",
+                entity: "Supplier",
+                entityId: created.SupplierId,
+                entityName: created.Name,
+                changesSummary: $"Tạo nhà cung cấp mới: {created.Name} (SĐT: {created.Phone})",
+                oldValues: null,
+                newValues: new
+                {
+                    created.SupplierId,
+                    created.Name,
+                    created.Phone,
+                    created.Email,
+                    created.Address,
+                    created.Status
+                }
+            );
+            
             return CreatedAtAction(nameof(GetById), new { id = created.SupplierId }, created);
         }
 
@@ -53,12 +94,43 @@ namespace StoreManagementAPI.Controllers
             var existing = await _supplierRepository.GetByIdAsync(id);
             if (existing == null) return NotFound();
 
+            var oldValues = new
+            {
+                existing.SupplierId,
+                existing.Name,
+                existing.Phone,
+                existing.Email,
+                existing.Address,
+                existing.Status
+            };
+
+            var oldName = existing.Name;
             existing.Name = supplier.Name;
             existing.Phone = supplier.Phone;
             existing.Email = supplier.Email;
             existing.Address = supplier.Address;
 
             var updated = await _supplierRepository.UpdateAsync(existing);
+            
+            // Log audit
+            LogAudit(
+                action: "UPDATE",
+                entity: "Supplier",
+                entityId: id,
+                entityName: updated.Name,
+                changesSummary: $"Cập nhật nhà cung cấp: {oldName} → {updated.Name}",
+                oldValues: oldValues,
+                newValues: new
+                {
+                    updated.SupplierId,
+                    updated.Name,
+                    updated.Phone,
+                    updated.Email,
+                    updated.Address,
+                    updated.Status
+                }
+            );
+            
             return Ok(updated);
         }
 
@@ -85,6 +157,16 @@ namespace StoreManagementAPI.Controllers
             var supplier = await _supplierRepository.GetByIdAsync(id);
             if (supplier == null) return NotFound();
 
+            var deletedValues = new
+            {
+                supplier.SupplierId,
+                supplier.Name,
+                supplier.Phone,
+                supplier.Email,
+                supplier.Address,
+                supplier.Status
+            };
+
             // Kiểm tra xem có sản phẩm hoặc đơn nhập hàng nào đang sử dụng supplier này không
             var hasProducts = await _context.Products
                 .AnyAsync(p => p.SupplierId == id && p.Status != "deleted");
@@ -97,6 +179,18 @@ namespace StoreManagementAPI.Controllers
                 // Có liên quan -> chỉ ẩn đi (soft delete)
                 supplier.Status = "inactive";
                 await _supplierRepository.UpdateAsync(supplier);
+                
+                // Log audit
+                LogAudit(
+                    action: "DELETE",
+                    entity: "Supplier",
+                    entityId: id,
+                    entityName: supplier.Name,
+                    changesSummary: $"Ẩn nhà cung cấp (có dữ liệu liên quan): {supplier.Name}",
+                    oldValues: deletedValues,
+                    newValues: new { supplier.Status }
+                );
+                
                 return Ok(new 
                 { 
                     message = "Nhà cung cấp có dữ liệu liên quan nên đã được ẩn thay vì xóa",
@@ -109,6 +203,18 @@ namespace StoreManagementAPI.Controllers
                 // Không có liên quan -> xóa hẳn
                 var result = await _supplierRepository.DeleteAsync(id);
                 if (!result) return NotFound();
+                
+                // Log audit
+                LogAudit(
+                    action: "DELETE",
+                    entity: "Supplier",
+                    entityId: id,
+                    entityName: supplier.Name,
+                    changesSummary: $"Xóa nhà cung cấp: {supplier.Name}",
+                    oldValues: deletedValues,
+                    newValues: null
+                );
+                
                 return Ok(new 
                 { 
                     message = "Đã xóa nhà cung cấp thành công",

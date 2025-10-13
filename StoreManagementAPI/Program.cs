@@ -7,6 +7,9 @@ using StoreManagementAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load appsettings.Local.json (ignored by git) for local development
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
 // Add services to the container
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

@@ -101,6 +101,8 @@ export interface Promotion {
   usageLimit: number;
   usedCount: number;
   status: "active" | "inactive";
+  applyType?: "order" | "product" | "combo";
+  products?: Array<{ productId: number; productName: string; price?: number }>;
 }
 
 export interface OrderItem {
@@ -136,6 +138,10 @@ export interface OrderResponse {
   finalAmount: number;
   paymentMethod?: string;
   paymentDate?: string;
+  promoId?: number;
+  promoCode?: string;
+  promoType?: string;
+  promoDescription?: string;
   items: OrderItemResponse[];
 }
 

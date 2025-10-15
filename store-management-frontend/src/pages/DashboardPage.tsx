@@ -13,13 +13,10 @@ import {
   Avatar,
 } from "antd";
 import {
-  ShoppingCartOutlined,
   ShoppingOutlined,
   TeamOutlined,
   DollarOutlined,
   RiseOutlined,
-  FallOutlined,
-  StockOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
 import {
@@ -37,16 +34,27 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { statisticsService, DashboardStatistics } from "@/services/statistics.service";
+import {
+  statisticsService,
+  DashboardStatistics,
+} from "@/services/statistics.service";
 import dayjs from "dayjs";
 
-const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82ca9d"];
+const COLORS = [
+  "#0088FE",
+  "#00C49F",
+  "#FFBB28",
+  "#FF8042",
+  "#8884D8",
+  "#82ca9d",
+];
 
 const DashboardPage: React.FC = () => {
-  const [statistics, setStatistics] = useState<DashboardStatistics | null>(null);
+  const [statistics, setStatistics] = useState<DashboardStatistics | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
 
@@ -115,16 +123,32 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div style={{ padding: "24px" }}>
-      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          marginBottom: 24,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <h2 style={{ margin: 0 }}>📊 Thống Kê & Báo Cáo</h2>
         <Space>
-          <Button onClick={() => setDays(7)} type={days === 7 ? "primary" : "default"}>
+          <Button
+            onClick={() => setDays(7)}
+            type={days === 7 ? "primary" : "default"}
+          >
             7 ngày
           </Button>
-          <Button onClick={() => setDays(30)} type={days === 30 ? "primary" : "default"}>
+          <Button
+            onClick={() => setDays(30)}
+            type={days === 30 ? "primary" : "default"}
+          >
             30 ngày
           </Button>
-          <Button onClick={() => setDays(90)} type={days === 90 ? "primary" : "default"}>
+          <Button
+            onClick={() => setDays(90)}
+            type={days === 90 ? "primary" : "default"}
+          >
             90 ngày
           </Button>
         </Space>
@@ -239,13 +263,17 @@ const DashboardPage: React.FC = () => {
                       dataKey="date"
                       tickFormatter={(value) => dayjs(value).format("DD/MM")}
                     />
-                    <YAxis tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                    <YAxis
+                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                    />
                     <Tooltip
                       formatter={(value: number, name: string) => [
                         name === "revenue" ? formatCurrency(value) : value,
-                        name === "revenue" ? "Doanh thu" : "Số đơn hàng"
+                        name === "revenue" ? "Doanh thu" : "Số đơn hàng",
                       ]}
-                      labelFormatter={(label) => `Ngày: ${dayjs(label).format("DD/MM/YYYY")}`}
+                      labelFormatter={(label) =>
+                        `Ngày: ${dayjs(label).format("DD/MM/YYYY")}`
+                      }
                     />
                     <Legend />
                     <Line
@@ -266,7 +294,7 @@ const DashboardPage: React.FC = () => {
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={statistics?.paymentMethods || []}
+                      data={(statistics?.paymentMethods as any) || []}
                       dataKey="totalAmount"
                       nameKey="method"
                       cx="50%"
@@ -274,11 +302,16 @@ const DashboardPage: React.FC = () => {
                       outerRadius={80}
                       label
                     >
-                      {(statistics?.paymentMethods || []).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      {(statistics?.paymentMethods || []).map((_, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                    />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -292,7 +325,9 @@ const DashboardPage: React.FC = () => {
             <Col xs={24} lg={16}>
               <Card title="Top sản phẩm bán chạy" loading={loading}>
                 <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={(statistics?.topSellingProducts || []).slice(0, 10)}>
+                  <BarChart
+                    data={(statistics?.topSellingProducts || []).slice(0, 10)}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="productName"
@@ -301,9 +336,17 @@ const DashboardPage: React.FC = () => {
                       height={100}
                     />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => value.toLocaleString("vi-VN")} />
+                    <Tooltip
+                      formatter={(value: number) =>
+                        value.toLocaleString("vi-VN")
+                      }
+                    />
                     <Legend />
-                    <Bar dataKey="totalQuantitySold" fill="#8884d8" name="Số lượng bán" />
+                    <Bar
+                      dataKey="totalQuantitySold"
+                      fill="#8884d8"
+                      name="Số lượng bán"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </Card>
@@ -329,7 +372,7 @@ const DashboardPage: React.FC = () => {
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={statistics?.ordersByStatus || []}
+                      data={(statistics?.ordersByStatus as any) || []}
                       dataKey="count"
                       nameKey="status"
                       cx="50%"
@@ -337,8 +380,11 @@ const DashboardPage: React.FC = () => {
                       outerRadius={100}
                       label={(entry) => `${entry.status}: ${entry.count}`}
                     >
-                      {(statistics?.ordersByStatus || []).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      {(statistics?.ordersByStatus || []).map((_, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -357,7 +403,9 @@ const DashboardPage: React.FC = () => {
                       dataIndex: "status",
                       key: "status",
                       render: (status: string) => (
-                        <Tag color={getStatusColor(status)}>{status.toUpperCase()}</Tag>
+                        <Tag color={getStatusColor(status)}>
+                          {status.toUpperCase()}
+                        </Tag>
                       ),
                     },
                     {

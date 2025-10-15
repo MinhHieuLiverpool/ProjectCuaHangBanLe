@@ -28,6 +28,10 @@ namespace StoreManagementAPI.DTOs
         public decimal FinalAmount { get; set; }
         public string? PaymentMethod { get; set; }
         public DateTime? PaymentDate { get; set; }
+        public int? PromoId { get; set; }
+        public string? PromoCode { get; set; }
+        public string? PromoType { get; set; }
+        public string? PromoDescription { get; set; }
         public List<OrderItemResponseDto> Items { get; set; } = new();
     }
 

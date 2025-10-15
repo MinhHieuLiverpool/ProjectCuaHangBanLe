@@ -11,17 +11,17 @@ import {
   Col,
   Divider,
   Tag,
-  Spin,
+  Button,
 } from "antd";
-import { Promotion } from "@/types";
-import { promotionService } from "@/services/common.service";
+import { Promotion, Product } from "@/types";
+import { promotionService, categoryService } from "@/services/common.service";
 import { productService } from "@/services/product.service";
 import dayjs from "dayjs";
 
-interface Product {
-  productId: number;
-  productName: string;
-  price: number;
+interface Category {
+  categoryId: number;
+  categoryName: string;
+  status: string;
 }
 
 interface PromotionModalProps {
@@ -41,22 +41,35 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [applyType, setApplyType] = useState<string>("order");
 
   useEffect(() => {
     if (visible) {
       loadProducts();
+      loadCategories();
       if (editingPromotion) {
         form.setFieldsValue({
           ...editingPromotion,
           startDate: dayjs(editingPromotion.startDate),
           endDate: dayjs(editingPromotion.endDate),
+          applyType: editingPromotion.applyType || "order",
         });
-        // TODO: Load selected products từ API
-        setSelectedProductIds([]);
+        setApplyType(editingPromotion.applyType || "order");
+        // Load selected products từ promotion
+        const productIds =
+          (editingPromotion as any).products?.map((p: any) => p.productId) ||
+          [];
+        setSelectedProductIds(productIds);
       } else {
         form.resetFields();
+        form.setFieldsValue({
+          applyType: "order",
+          status: "active", // Luôn set active khi tạo mới
+        });
+        setApplyType("order");
         setSelectedProductIds([]);
       }
     }
@@ -66,13 +79,7 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
     try {
       setLoading(true);
       const data = await productService.getAll();
-      setProducts(
-        data.map((p) => ({
-          productId: p.productId,
-          productName: p.productName,
-          price: p.price,
-        }))
-      );
+      setProducts(data);
     } catch (error) {
       message.error("Tải danh sách sản phẩm thất bại!");
     } finally {
@@ -80,14 +87,33 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const data = await categoryService.getAll();
+      setCategories(data.filter((c) => c.status === "active"));
+    } catch (error) {
+      message.error("Tải danh sách loại sản phẩm thất bại!");
+    }
+  };
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+
+      // Xác định applyType dựa trên form value và productIds
+      let finalApplyType = values.applyType || "order";
+      if (selectedProductIds.length > 0 && finalApplyType === "order") {
+        // Nếu có sản phẩm được chọn nhưng applyType vẫn là order, tự động đổi thành product
+        finalApplyType = "product";
+      }
+
       const data = {
         ...values,
         startDate: values.startDate.format("YYYY-MM-DD"),
         endDate: values.endDate.format("YYYY-MM-DD"),
-        productIds: selectedProductIds, // Thêm danh sách sản phẩm
+        applyType: finalApplyType,
+        status: editingPromotion ? values.status : "active", // Luôn active khi tạo mới
+        productIds: selectedProductIds, // Luôn gửi productIds
       };
 
       if (editingPromotion) {
@@ -112,12 +138,16 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
 
     // Nếu đang sửa, kiểm tra ngày kết thúc mới phải >= ngày kết thúc cũ
     if (editingPromotion) {
-      const oldEndDate = dayjs(editingPromotion.endDate).startOf('day');
-      const newEndDate = value.startOf('day');
-      
+      const oldEndDate = dayjs(editingPromotion.endDate).startOf("day");
+      const newEndDate = value.startOf("day");
+
       if (newEndDate.isBefore(oldEndDate)) {
         return Promise.reject(
-          new Error(`Ngày kết thúc mới không được trước ngày ${oldEndDate.format("DD/MM/YYYY")}`)
+          new Error(
+            `Ngày kết thúc mới không được trước ngày ${oldEndDate.format(
+              "DD/MM/YYYY"
+            )}`
+          )
         );
       }
     }
@@ -144,28 +174,59 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
               label="Mã khuyến mãi"
               rules={[{ required: true, message: "Vui lòng nhập mã!" }]}
             >
-              <Input 
-                placeholder="Nhập mã khuyến mãi" 
+              <Input
+                placeholder="Nhập mã khuyến mãi"
                 disabled={!!editingPromotion}
               />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item
-              name="status"
-              label="Trạng thái"
-              rules={[{ required: true, message: "Vui lòng chọn trạng thái!" }]}
+              name="applyType"
+              label="Loại khuyến mãi"
+              rules={[{ required: true, message: "Vui lòng chọn loại!" }]}
             >
-              <Select placeholder="Chọn trạng thái">
-                <Select.Option value="active">Đang áp dụng</Select.Option>
-                <Select.Option value="inactive">Hết hạn</Select.Option>
+              <Select
+                placeholder="Chọn loại khuyến mãi"
+                onChange={(value) => setApplyType(value)}
+                disabled={!!editingPromotion}
+              >
+                <Select.Option value="order">
+                  Giảm giá theo đơn hàng
+                </Select.Option>
+                <Select.Option value="product">
+                  Giảm giá theo sản phẩm
+                </Select.Option>
+                <Select.Option value="combo">
+                  Giảm giá nhiều sản phẩm cùng lúc
+                </Select.Option>
               </Select>
             </Form.Item>
           </Col>
         </Row>
 
+        {editingPromotion && (
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="status"
+                label="Trạng thái"
+                rules={[
+                  { required: true, message: "Vui lòng chọn trạng thái!" },
+                ]}
+              >
+                <Select placeholder="Chọn trạng thái">
+                  <Select.Option value="active">Đang áp dụng</Select.Option>
+                  <Select.Option value="inactive">Hết hạn</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}></Col>
+          </Row>
+        )}
+
         <Form.Item name="description" label="Mô tả">
-          <Input.TextArea rows={3} placeholder="Nhập mô tả khuyến mãi" />
+          <Input.TextArea rows={2} placeholder="Nhập mô tả khuyến mãi" />
         </Form.Item>
 
         {/* Thông tin giảm giá */}
@@ -256,9 +317,9 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
               label="Ngày kết thúc"
               rules={[
                 { required: true, message: "Vui lòng chọn ngày!" },
-                { validator: validateEndDate }
+                { validator: validateEndDate },
               ]}
-              validateTrigger={['onChange', 'onBlur']}
+              validateTrigger={["onChange", "onBlur"]}
             >
               <DatePicker
                 style={{ width: "100%" }}
@@ -269,59 +330,115 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
           </Col>
         </Row>
 
-        {/* Áp dụng cho sản phẩm - chỉ hiện khi không phải khuyến mãi chung */}
-        {!hideProductSelection && (
-          <>
-            <Divider style={{ margin: "16px 0" }}>Áp dụng cho sản phẩm</Divider>
-            
-            <Form.Item
-              label="Chọn sản phẩm áp dụng"
-              tooltip="Chọn các sản phẩm được áp dụng khuyến mãi này"
-            >
-          <Select
-            mode="multiple"
-            placeholder="Chọn sản phẩm"
-            style={{ width: "100%" }}
-            loading={loading}
-            value={selectedProductIds}
-            onChange={setSelectedProductIds}
-            optionFilterProp="label"
-            showSearch
-            filterOption={(input, option) =>
-              (option?.label ?? "")
-                .toString()
-                .toLowerCase()
-                .includes(input.toLowerCase())
-            }
-            options={products.map((product) => ({
-              value: product.productId,
-              label: `${product.productName} - ${product.price.toLocaleString()}đ`,
-            }))}
-          />
-        </Form.Item>
+        {/* Áp dụng cho sản phẩm - chỉ hiện khi applyType là product hoặc category */}
+        {!hideProductSelection &&
+          (applyType === "product" || applyType === "combo") && (
+            <>
+              <Divider style={{ margin: "16px 0" }}>
+                {applyType === "product"
+                  ? "Áp dụng cho sản phẩm"
+                  : "Chọn nhiều sản phẩm cùng lúc"}
+              </Divider>
 
-        {selectedProductIds.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            <span style={{ color: "#666", fontSize: 13 }}>
-              Đã chọn: {selectedProductIds.length} sản phẩm
-            </span>
-            <div style={{ marginTop: 8 }}>
-              {selectedProductIds.slice(0, 5).map((id) => {
-                const product = products.find((p) => p.productId === id);
-                return product ? (
-                  <Tag key={id} color="blue" style={{ marginBottom: 4 }}>
-                    {product.productName}
-                  </Tag>
-                ) : null;
-              })}
-              {selectedProductIds.length > 5 && (
-                <Tag>+{selectedProductIds.length - 5} sản phẩm khác</Tag>
+              <Form.Item
+                label={
+                  applyType === "product"
+                    ? "Chọn sản phẩm áp dụng"
+                    : "Chọn các sản phẩm áp dụng"
+                }
+                tooltip={
+                  applyType === "product"
+                    ? "Chọn các sản phẩm được áp dụng khuyến mãi này"
+                    : "Chọn nhiều sản phẩm. Khuyến mãi sẽ áp dụng cho TẤT CẢ sản phẩm đã chọn nếu đơn hàng có ít nhất 1 sản phẩm trong danh sách này."
+                }
+              >
+                <Select
+                  mode="multiple"
+                  placeholder={
+                    applyType === "product"
+                      ? "Chọn sản phẩm"
+                      : "Chọn nhiều sản phẩm"
+                  }
+                  style={{ width: "100%" }}
+                  loading={loading}
+                  value={selectedProductIds}
+                  onChange={setSelectedProductIds}
+                  optionFilterProp="label"
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.label ?? "")
+                      .toString()
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
+                  }
+                  options={
+                    applyType === "product" || applyType === "combo"
+                      ? products.map((product) => ({
+                          value: product.productId,
+                          label: `${
+                            product.productName
+                          } - ${product.price.toLocaleString()}đ`,
+                        }))
+                      : categories.map((category) => ({
+                          value: category.categoryId,
+                          label: category.categoryName,
+                        }))
+                  }
+                />
+              </Form.Item>
+
+              {selectedProductIds.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span style={{ color: "#666", fontSize: 13 }}>
+                      Đã chọn: {selectedProductIds.length}{" "}
+                      {applyType === "product" || applyType === "combo"
+                        ? "sản phẩm"
+                        : "loại sản phẩm"}
+                    </span>
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => setSelectedProductIds([])}
+                      style={{ padding: 0, height: "auto", fontSize: 12 }}
+                    >
+                      Xóa tất cả
+                    </Button>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {selectedProductIds.slice(0, 5).map((id) => {
+                      const item =
+                        applyType === "product" || applyType === "combo"
+                          ? products.find((p) => p.productId === id)
+                          : categories.find((c) => c.categoryId === id);
+                      return item ? (
+                        <Tag key={id} color="blue" style={{ marginBottom: 4 }}>
+                          {applyType === "product" || applyType === "combo"
+                            ? (item as Product).productName
+                            : (item as Category).categoryName}
+                        </Tag>
+                      ) : null;
+                    })}
+                    {selectedProductIds.length > 5 && (
+                      <Tag>
+                        +{selectedProductIds.length - 5}{" "}
+                        {applyType === "product" || applyType === "combo"
+                          ? "sản phẩm"
+                          : "loại sản phẩm"}{" "}
+                        khác
+                      </Tag>
+                    )}
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
-        )}
-          </>
-        )}
+            </>
+          )}
       </Form>
     </Modal>
   );

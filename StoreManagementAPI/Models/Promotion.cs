@@ -49,6 +49,10 @@ namespace StoreManagementAPI.Models
         [StringLength(10)]
         public string Status { get; set; } = "active";
 
+        [Column("apply_type")]
+        [StringLength(20)]
+        public string ApplyType { get; set; } = "order"; // order, product, combo
+
         // Navigation properties
         public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
         public virtual ICollection<PromotionProduct> PromotionProducts { get; set; } = new List<PromotionProduct>();

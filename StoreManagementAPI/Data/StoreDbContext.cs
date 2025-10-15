@@ -17,8 +17,6 @@ namespace StoreManagementAPI.Data
         public DbSet<Inventory> Inventories { get; set; }
         public DbSet<Promotion> Promotions { get; set; }
         public DbSet<PromotionProduct> PromotionProducts { get; set; }
-        public DbSet<ComboPromotion> ComboPromotions { get; set; }
-        public DbSet<ComboPromotionItem> ComboPromotionItems { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<Payment> Payments { get; set; }
@@ -122,22 +120,6 @@ namespace StoreManagementAPI.Data
             modelBuilder.Entity<PromotionProduct>()
                 .HasIndex(pp => new { pp.PromoId, pp.ProductId })
                 .IsUnique();
-
-            // ComboPromotion relationships
-            modelBuilder.Entity<ComboPromotionItem>()
-                .HasOne(ci => ci.ComboPromotion)
-                .WithMany(c => c.ComboItems)
-                .HasForeignKey(ci => ci.ComboId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<ComboPromotionItem>()
-                .HasOne(ci => ci.Product)
-                .WithMany(p => p.ComboPromotionItems)
-                .HasForeignKey(ci => ci.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<ComboPromotion>()
-                .HasIndex(c => c.ComboName);
 
             // Purchase Orders relationships
             modelBuilder.Entity<PurchaseOrder>()

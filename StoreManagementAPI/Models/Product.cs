@@ -63,6 +63,5 @@ namespace StoreManagementAPI.Models
         public virtual ICollection<Inventory> Inventories { get; set; } = new List<Inventory>();
         public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public virtual ICollection<PromotionProduct> PromotionProducts { get; set; } = new List<PromotionProduct>();
-        public virtual ICollection<ComboPromotionItem> ComboPromotionItems { get; set; } = new List<ComboPromotionItem>();
     }
 }

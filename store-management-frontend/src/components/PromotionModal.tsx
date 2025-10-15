@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   Form,
@@ -9,16 +9,27 @@ import {
   message,
   Row,
   Col,
+  Divider,
+  Tag,
+  Spin,
 } from "antd";
 import { Promotion } from "@/types";
 import { promotionService } from "@/services/common.service";
+import { productService } from "@/services/product.service";
 import dayjs from "dayjs";
+
+interface Product {
+  productId: number;
+  productName: string;
+  price: number;
+}
 
 interface PromotionModalProps {
   visible: boolean;
   editingPromotion: Promotion | null;
   onClose: () => void;
   onSuccess: () => void;
+  hideProductSelection?: boolean; // True = không hiện chọn sản phẩm (khuyến mãi chung)
 }
 
 const PromotionModal: React.FC<PromotionModalProps> = ({
@@ -26,22 +37,48 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
   editingPromotion,
   onClose,
   onSuccess,
+  hideProductSelection = false,
 }) => {
   const [form] = Form.useForm();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (visible) {
+      loadProducts();
       if (editingPromotion) {
         form.setFieldsValue({
           ...editingPromotion,
           startDate: dayjs(editingPromotion.startDate),
           endDate: dayjs(editingPromotion.endDate),
         });
+        // TODO: Load selected products từ API
+        setSelectedProductIds([]);
       } else {
         form.resetFields();
+        setSelectedProductIds([]);
       }
     }
   }, [visible, editingPromotion, form]);
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await productService.getAll();
+      setProducts(
+        data.map((p) => ({
+          productId: p.productId,
+          productName: p.productName,
+          price: p.price,
+        }))
+      );
+    } catch (error) {
+      message.error("Tải danh sách sản phẩm thất bại!");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     try {
@@ -50,6 +87,7 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
         ...values,
         startDate: values.startDate.format("YYYY-MM-DD"),
         endDate: values.endDate.format("YYYY-MM-DD"),
+        productIds: selectedProductIds, // Thêm danh sách sản phẩm
       };
 
       if (editingPromotion) {
@@ -230,6 +268,60 @@ const PromotionModal: React.FC<PromotionModalProps> = ({
             </Form.Item>
           </Col>
         </Row>
+
+        {/* Áp dụng cho sản phẩm - chỉ hiện khi không phải khuyến mãi chung */}
+        {!hideProductSelection && (
+          <>
+            <Divider style={{ margin: "16px 0" }}>Áp dụng cho sản phẩm</Divider>
+            
+            <Form.Item
+              label="Chọn sản phẩm áp dụng"
+              tooltip="Chọn các sản phẩm được áp dụng khuyến mãi này"
+            >
+          <Select
+            mode="multiple"
+            placeholder="Chọn sản phẩm"
+            style={{ width: "100%" }}
+            loading={loading}
+            value={selectedProductIds}
+            onChange={setSelectedProductIds}
+            optionFilterProp="label"
+            showSearch
+            filterOption={(input, option) =>
+              (option?.label ?? "")
+                .toString()
+                .toLowerCase()
+                .includes(input.toLowerCase())
+            }
+            options={products.map((product) => ({
+              value: product.productId,
+              label: `${product.productName} - ${product.price.toLocaleString()}đ`,
+            }))}
+          />
+        </Form.Item>
+
+        {selectedProductIds.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <span style={{ color: "#666", fontSize: 13 }}>
+              Đã chọn: {selectedProductIds.length} sản phẩm
+            </span>
+            <div style={{ marginTop: 8 }}>
+              {selectedProductIds.slice(0, 5).map((id) => {
+                const product = products.find((p) => p.productId === id);
+                return product ? (
+                  <Tag key={id} color="blue" style={{ marginBottom: 4 }}>
+                    {product.productName}
+                  </Tag>
+                ) : null;
+              })}
+              {selectedProductIds.length > 5 && (
+                <Tag>+{selectedProductIds.length - 5} sản phẩm khác</Tag>
+              )}
+            </div>
+          </div>
+        )}
+          </>
+        )}
       </Form>
     </Modal>
   );

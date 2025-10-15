@@ -20,12 +20,11 @@ import {
   UserAddOutlined,
   BarcodeOutlined,
   EditOutlined,
-  CameraOutlined,
   PlusOutlined,
   MinusOutlined,
 } from "@ant-design/icons";
 import { Customer, Product, Promotion } from "@/types";
-import BarcodeScanner from "./BarcodeScanner";
+import BarcodeCameraButton from "../shared/BarcodeCameraButton";
 
 interface OrderItem {
   productId: number;
@@ -60,7 +59,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [inputMode, setInputMode] = useState<"manual" | "barcode">("manual");
   const [barcodeInput, setBarcodeInput] = useState("");
-  const [showScanner, setShowScanner] = useState(false);
   const barcodeInputRef = useRef<any>(null);
 
   // Auto focus vào input barcode khi chuyển sang chế độ quét
@@ -532,15 +530,12 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             </Col>
             <Col span={4}>
               <Form.Item label=" ">
-                <Button
-                  onClick={() => setShowScanner(true)}
+                <BarcodeCameraButton
+                  onScan={handleBarcodeScan}
+                  buttonText="Camera"
+                  buttonSize="large"
                   block
-                  type="default"
-                  size="large"
-                  icon={<CameraOutlined />}
-                >
-                  Camera
-                </Button>
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -588,13 +583,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           </div>
         </Card>
       </Form>
-
-      {/* Barcode Scanner Modal */}
-      <BarcodeScanner
-        visible={showScanner}
-        onClose={() => setShowScanner(false)}
-        onScan={handleBarcodeScan}
-      />
     </Modal>
   );
 };

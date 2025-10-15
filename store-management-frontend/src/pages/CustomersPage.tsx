@@ -148,7 +148,12 @@ const CustomersPage: React.FC = () => {
         dataSource={customers}
         rowKey="customerId"
         loading={loading}
-        pagination={{ pageSize: 10 }}
+        pagination={{
+          defaultPageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ["10", "50", "100"],
+          showTotal: (total) => `Tổng ${total} mục`,
+        }}
       />
 
       <Modal

@@ -409,6 +409,7 @@ const AuditLogsPage: React.FC = () => {
                 pageSize: filter.pageSize,
                 total: total,
                 showSizeChanger: true,
+                pageSizeOptions: ["10", "50", "100"],
                 showTotal: (total) => `Tổng ${total} bản ghi`,
                 onChange: (page, pageSize) => {
                   setFilter({ ...filter, page, pageSize });

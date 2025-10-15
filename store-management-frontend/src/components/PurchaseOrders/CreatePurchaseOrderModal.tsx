@@ -107,6 +107,15 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderModalProps> = ({
     }
   };
 
+  const handleProductChange = (productId: number) => {
+    const product = products.find((p) => p.productId === productId);
+    if (product && product.costPrice) {
+      form.setFieldsValue({ costPrice: product.costPrice });
+    } else {
+      form.setFieldsValue({ costPrice: 0 });
+    }
+  };
+
   const handleAddItem = () => {
     const productId = form.getFieldValue("productId");
     const quantity = form.getFieldValue("quantity") || 1;
@@ -441,6 +450,7 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderModalProps> = ({
                   <Select
                     placeholder="Chọn sản phẩm"
                     showSearch
+                    onChange={handleProductChange}
                     filterOption={(input, option) =>
                       (option?.label ?? "")
                         .toLowerCase()
@@ -469,6 +479,7 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderModalProps> = ({
                   <InputNumber
                     placeholder="Giá nhập"
                     min={0}
+                    disabled
                     style={{ width: "100%" }}
                     formatter={(value) =>
                       `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")

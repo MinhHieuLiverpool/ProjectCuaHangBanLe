@@ -442,7 +442,12 @@ const ProductDetailPage: React.FC = () => {
             dataSource={filteredHistory}
             loading={historyLoading}
             rowKey={(record) => `${record.type}-${record.id}-${record.date}`}
-            pagination={{ pageSize: 10, showSizeChanger: true }}
+            pagination={{
+              defaultPageSize: 10,
+              showSizeChanger: true,
+              pageSizeOptions: ["10", "50", "100"],
+              showTotal: (total) => `Tổng ${total} mục`,
+            }}
             size="small"
             scroll={{ x: 1000 }}
             columns={[

@@ -24,6 +24,14 @@ export const customerService = {
   async delete(id: number): Promise<void> {
     await apiClient.delete(`/customers/${id}`);
   },
+async checkPhoneExists(phone: string): Promise<boolean> {
+  const response = await apiClient.get<{ exists: boolean }>(
+    `/customers/check-phone`,
+    { params: { phone } }
+  );
+  return response.data.exists; // ✅ trả về boolean
+},
+
 };
 
 export const categoryService = {

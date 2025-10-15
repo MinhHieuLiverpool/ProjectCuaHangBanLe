@@ -17,6 +17,38 @@ namespace StoreManagementAPI.Controllers
             _customerRepository = customerRepository;
         }
 
+                        // ✅ Kiểm tra số điện thoại đã tồn tại chưa
+[HttpGet("check-phone")]
+public async Task<ActionResult> CheckPhone([FromQuery] string phone)
+{
+    if (string.IsNullOrWhiteSpace(phone))
+        return BadRequest(new { message = "Phone is required" });
+
+    // Chuẩn hóa số điện thoại (bỏ khoảng trắng, thay +84 bằng 0)
+    phone = phone.Trim();
+    if (phone.StartsWith("+84"))
+        phone = phone.Replace("+84", "0");
+
+    var customers = await _customerRepository.GetAllAsync();
+
+    Console.WriteLine($"===> Tổng số customer: {customers.Count()}");
+    Console.WriteLine($"===> Kiểm tra phone: {phone}");
+
+    // So sánh mềm hơn (Trim, Replace, loại ký tự không cần thiết)
+    var exists = customers.Any(c =>
+    {
+        if (string.IsNullOrWhiteSpace(c.Phone))
+            return false;
+
+        var dbPhone = c.Phone.Trim().Replace("+84", "0");
+        return dbPhone == phone;
+    });
+
+    Console.WriteLine($"===> Kết quả: {exists}");
+
+    return Ok(new { exists });
+}
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Customer>>> GetAll()
         {
@@ -24,7 +56,7 @@ namespace StoreManagementAPI.Controllers
             return Ok(customers);
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{id:int}")]
         public async Task<ActionResult<Customer>> GetById(int id)
         {
             var customer = await _customerRepository.GetByIdAsync(id);

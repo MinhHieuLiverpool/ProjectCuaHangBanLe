@@ -19,23 +19,48 @@ namespace StoreManagementAPI.Controllers
         private readonly IRepository<PromotionProduct> _promotionProductRepository;
         private readonly IPromotionService _promotionService;
         private readonly StoreDbContext _context;
+        private readonly IAuditLogService _auditLogService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public PromotionsController(
             IRepository<Promotion> promotionRepository,
             IRepository<PromotionProduct> promotionProductRepository,
             IPromotionService promotionService,
-            StoreDbContext context)
+            StoreDbContext context,
+            IAuditLogService auditLogService,
+            IHttpContextAccessor httpContextAccessor)
         {
             _promotionRepository = promotionRepository;
             _promotionProductRepository = promotionProductRepository;
             _promotionService = promotionService;
             _context = context;
+            _auditLogService = auditLogService;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         private int? GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             return userIdClaim != null ? int.Parse(userIdClaim) : null;
+        }
+
+        private (int? userId, string? username) GetAuditInfo()
+        {
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext == null)
+                return (1, "admin"); // Default to admin user (id=1)
+
+            var userIdClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var usernameClaim = httpContext.User.FindFirst(ClaimTypes.Name)?.Value;
+
+            int? userId = null;
+            if (int.TryParse(userIdClaim, out int parsedUserId))
+                userId = parsedUserId;
+
+            var username = !string.IsNullOrEmpty(usernameClaim) ? usernameClaim : "admin";
+            var finalUserId = userId ?? 1;
+
+            return (finalUserId, username);
         }
 
         [HttpGet]
@@ -195,6 +220,39 @@ namespace StoreManagementAPI.Controllers
                 }).ToList()
             };
 
+            // Log audit
+            var (userId, username) = GetAuditInfo();
+            var discountText = promotionWithProducts.DiscountType == "percentage"
+                ? $"{promotionWithProducts.DiscountValue}%"
+                : $"{promotionWithProducts.DiscountValue:N0} VNĐ";
+            var applyTypeText = promotionWithProducts.ApplyType == "all" ? "Tất cả sản phẩm" : $"{promotionWithProducts.PromotionProducts.Count} sản phẩm cụ thể";
+
+            await _auditLogService.LogActionAsync(
+                action: "CREATE",
+                entityType: "Promotion",
+                entityId: promotionWithProducts.PromoId,
+                entityName: promotionWithProducts.PromoCode,
+                oldValues: null,
+                newValues: new
+                {
+                    PromoId = promotionWithProducts.PromoId,
+                    PromoCode = promotionWithProducts.PromoCode,
+                    Description = promotionWithProducts.Description,
+                    DiscountType = promotionWithProducts.DiscountType,
+                    DiscountValue = promotionWithProducts.DiscountValue,
+                    StartDate = promotionWithProducts.StartDate,
+                    EndDate = promotionWithProducts.EndDate,
+                    MinOrderAmount = promotionWithProducts.MinOrderAmount,
+                    UsageLimit = promotionWithProducts.UsageLimit,
+                    Status = promotionWithProducts.Status,
+                    ApplyType = promotionWithProducts.ApplyType,
+                    ProductIds = createDto.ProductIds
+                },
+                changesSummary: $"Tạo khuyến mãi mới: {promotionWithProducts.PromoCode} - {promotionWithProducts.Description} (Giảm {discountText}, Áp dụng: {applyTypeText}, Thời gian: {promotionWithProducts.StartDate:dd/MM/yyyy} - {promotionWithProducts.EndDate:dd/MM/yyyy})",
+                userId: userId,
+                username: username
+            );
+
             return CreatedAtAction(nameof(GetById), new { id = created.PromoId }, promotionDto);
         }
 
@@ -207,28 +265,72 @@ namespace StoreManagementAPI.Controllers
 
             if (existing == null) return NotFound();
 
+            // Lưu giá trị cũ để audit
+            var oldValues = new
+            {
+                PromoId = existing.PromoId,
+                PromoCode = existing.PromoCode,
+                Description = existing.Description,
+                DiscountType = existing.DiscountType,
+                DiscountValue = existing.DiscountValue,
+                StartDate = existing.StartDate,
+                EndDate = existing.EndDate,
+                MinOrderAmount = existing.MinOrderAmount,
+                UsageLimit = existing.UsageLimit,
+                Status = existing.Status,
+                ApplyType = existing.ApplyType,
+                ProductIds = existing.PromotionProducts.Select(pp => pp.ProductId).ToList()
+            };
+
+            var changes = new List<string>();
+
             // Cập nhật các trường nếu có giá trị
-            if (!string.IsNullOrEmpty(updateDto.Description))
+            if (!string.IsNullOrEmpty(updateDto.Description) && existing.Description != updateDto.Description)
+            {
+                changes.Add($"Mô tả: '{existing.Description}' → '{updateDto.Description}'");
                 existing.Description = updateDto.Description;
+            }
 
-            if (!string.IsNullOrEmpty(updateDto.DiscountType))
+            if (!string.IsNullOrEmpty(updateDto.DiscountType) && existing.DiscountType != updateDto.DiscountType)
+            {
+                var oldTypeText = existing.DiscountType == "percentage" ? "Phần trăm" : "Giá trị cố định";
+                var newTypeText = updateDto.DiscountType == "percentage" ? "Phần trăm" : "Giá trị cố định";
+                changes.Add($"Loại giảm giá: {oldTypeText} → {newTypeText}");
                 existing.DiscountType = updateDto.DiscountType;
+            }
 
-            if (updateDto.DiscountValue.HasValue)
+            if (updateDto.DiscountValue.HasValue && existing.DiscountValue != updateDto.DiscountValue.Value)
+            {
+                changes.Add($"Giá trị giảm: {existing.DiscountValue} → {updateDto.DiscountValue.Value}");
                 existing.DiscountValue = updateDto.DiscountValue.Value;
+            }
 
-            if (updateDto.EndDate.HasValue)
+            if (updateDto.EndDate.HasValue && existing.EndDate != updateDto.EndDate.Value)
+            {
+                changes.Add($"Ngày kết thúc: {existing.EndDate:dd/MM/yyyy} → {updateDto.EndDate.Value:dd/MM/yyyy}");
                 existing.EndDate = updateDto.EndDate.Value;
+            }
 
-            if (updateDto.MinOrderAmount.HasValue)
+            if (updateDto.MinOrderAmount.HasValue && existing.MinOrderAmount != updateDto.MinOrderAmount.Value)
+            {
+                changes.Add($"Giá trị đơn hàng tối thiểu: {existing.MinOrderAmount:N0} → {updateDto.MinOrderAmount.Value:N0} VNĐ");
                 existing.MinOrderAmount = updateDto.MinOrderAmount.Value;
+            }
 
-            if (!string.IsNullOrEmpty(updateDto.Status))
+            if (!string.IsNullOrEmpty(updateDto.Status) && existing.Status != updateDto.Status)
+            {
+                changes.Add($"Trạng thái: {existing.Status} → {updateDto.Status}");
                 existing.Status = updateDto.Status;
+            }
 
             // Cập nhật ApplyType
-            if (!string.IsNullOrEmpty(updateDto.ApplyType))
+            if (!string.IsNullOrEmpty(updateDto.ApplyType) && existing.ApplyType != updateDto.ApplyType)
+            {
+                var oldApplyText = existing.ApplyType == "all" ? "Tất cả sản phẩm" : "Sản phẩm cụ thể";
+                var newApplyText = updateDto.ApplyType == "all" ? "Tất cả sản phẩm" : "Sản phẩm cụ thể";
+                changes.Add($"Áp dụng cho: {oldApplyText} → {newApplyText}");
                 existing.ApplyType = updateDto.ApplyType;
+            }
 
             // Cập nhật PromotionProducts nếu ProductIds thay đổi
             if (updateDto.ProductIds != null)
@@ -237,6 +339,14 @@ namespace StoreManagementAPI.Controllers
                 var existingPromotionProducts = await _context.PromotionProducts
                     .Where(pp => pp.PromoId == id)
                     .ToListAsync();
+
+                var oldProductIds = existingPromotionProducts.Select(pp => pp.ProductId).OrderBy(x => x).ToList();
+                var newProductIds = updateDto.ProductIds.OrderBy(x => x).ToList();
+
+                if (!oldProductIds.SequenceEqual(newProductIds))
+                {
+                    changes.Add($"Sản phẩm áp dụng: {oldProductIds.Count} sản phẩm → {newProductIds.Count} sản phẩm");
+                }
 
                 _context.PromotionProducts.RemoveRange(existingPromotionProducts);
                 await _context.SaveChangesAsync();
@@ -287,14 +397,87 @@ namespace StoreManagementAPI.Controllers
                 }).ToList()
             };
 
+            // Log audit nếu có thay đổi
+            if (changes.Any())
+            {
+                var (userId, username) = GetAuditInfo();
+                await _auditLogService.LogActionAsync(
+                    action: "UPDATE",
+                    entityType: "Promotion",
+                    entityId: updatedPromotion.PromoId,
+                    entityName: updatedPromotion.PromoCode,
+                    oldValues: oldValues,
+                    newValues: new
+                    {
+                        PromoId = updatedPromotion.PromoId,
+                        PromoCode = updatedPromotion.PromoCode,
+                        Description = updatedPromotion.Description,
+                        DiscountType = updatedPromotion.DiscountType,
+                        DiscountValue = updatedPromotion.DiscountValue,
+                        StartDate = updatedPromotion.StartDate,
+                        EndDate = updatedPromotion.EndDate,
+                        MinOrderAmount = updatedPromotion.MinOrderAmount,
+                        UsageLimit = updatedPromotion.UsageLimit,
+                        Status = updatedPromotion.Status,
+                        ApplyType = updatedPromotion.ApplyType,
+                        ProductIds = updateDto.ProductIds
+                    },
+                    changesSummary: $"Cập nhật khuyến mãi '{updatedPromotion.PromoCode}': {string.Join(", ", changes)}",
+                    userId: userId,
+                    username: username
+                );
+            }
+
             return Ok(promotionDto);
         }
 
         [HttpDelete("{id}")]
         public async Task<ActionResult> Delete(int id)
         {
+            // Lấy thông tin promotion trước khi xóa
+            var promotion = await _context.Promotions
+                .Include(p => p.PromotionProducts)
+                .FirstOrDefaultAsync(p => p.PromoId == id);
+
+            if (promotion == null) return NotFound();
+
+            var promotionInfo = new
+            {
+                PromoId = promotion.PromoId,
+                PromoCode = promotion.PromoCode,
+                Description = promotion.Description,
+                DiscountType = promotion.DiscountType,
+                DiscountValue = promotion.DiscountValue,
+                StartDate = promotion.StartDate,
+                EndDate = promotion.EndDate,
+                MinOrderAmount = promotion.MinOrderAmount,
+                UsageLimit = promotion.UsageLimit,
+                UsedCount = promotion.UsedCount,
+                Status = promotion.Status,
+                ApplyType = promotion.ApplyType,
+                ProductCount = promotion.PromotionProducts.Count
+            };
+
             var result = await _promotionRepository.DeleteAsync(id);
             if (!result) return NotFound();
+
+            // Log audit
+            var (userId, username) = GetAuditInfo();
+            var discountText = promotion.DiscountType == "percentage"
+                ? $"{promotion.DiscountValue}%"
+                : $"{promotion.DiscountValue:N0} VNĐ";
+
+            await _auditLogService.LogActionAsync(
+                action: "DELETE",
+                entityType: "Promotion",
+                entityId: promotion.PromoId,
+                entityName: promotion.PromoCode,
+                oldValues: promotionInfo,
+                newValues: null,
+                changesSummary: $"Xóa khuyến mãi '{promotion.PromoCode}' - {promotion.Description} (Giảm {discountText}, Đã sử dụng: {promotion.UsedCount}/{promotion.UsageLimit})",
+                userId: userId,
+                username: username
+            );
 
             return Ok(new { message = "Promotion deleted successfully" });
         }

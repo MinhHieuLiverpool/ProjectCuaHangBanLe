@@ -10,6 +10,7 @@ import {
   Statistic,
   Tabs,
   Tag,
+  message, // thông báo
 } from "antd";
 import {
   DownloadOutlined,
@@ -38,6 +39,7 @@ import {
   CustomerStatistics,
 } from "@/services/statistics.service";
 import dayjs, { Dayjs } from "dayjs";
+import * as XLSX from "xlsx";
 
 const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
@@ -53,6 +55,7 @@ const StatisticsPage: React.FC = () => {
   const [inventoryStats, setInventoryStats] = useState<InventoryStatistics | null>(null);
   const [customerStats, setCustomerStats] = useState<CustomerStatistics | null>(null);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("sales"); // tab dau tien
 
   const fetchReports = async () => {
     try {
@@ -92,6 +95,138 @@ const StatisticsPage: React.FC = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    const today = dayjs().format("DD-MM-YYYY");
+    switch (activeTab) {
+      case "sales":
+        if (salesReport) exportSalesReport(salesReport, today);
+        else message.warning("No sales report data to export.");
+        break;
+      case "inventory":
+        if (inventoryStats) exportInventoryReport(inventoryStats, today);
+        else message.warning("No inventory data to export.");
+        break;
+      case "customers":
+        if (customerStats) exportCustomerReport(customerStats, today);
+        else message.warning("No customer data to export.");
+        break;
+      default:
+        message.error("Invalid tab.");
+    }
+  };
+
+  const exportSalesReport = (data: SalesReport, date: string) => {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Tổng quan
+    const summaryData = [
+      ["Báo cáo bán hàng từ", dateRange[0].format("DD/MM/YYYY"), "đến", dateRange[1].format("DD/MM/YYYY")],
+      [],
+      ["Chỉ số", "Giá trị"],
+      ["Tổng doanh thu", data.totalRevenue],
+      ["Tổng chi phí", data.totalCost],
+      ["Lợi nhuận", data.profit],
+      ["Tổng đơn hàng", data.totalOrders],
+      ["Tổng sản phẩm đã bán", data.totalItemsSold],
+    ];
+    const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, summaryWs, "Tổng quan");
+
+    // Sheet 2: Doanh thu hàng ngày
+    const dailyRevenueWs = XLSX.utils.json_to_sheet(data.dailyRevenue.map(item => ({
+      'Ngày': dayjs(item.date).format('DD/MM/YYYY'),
+      'Doanh thu': item.revenue,
+      'Số đơn hàng': item.orderCount
+    })));
+    XLSX.utils.book_append_sheet(wb, dailyRevenueWs, "Doanh thu hàng ngày");
+
+    // Sheet 3: Top sản phẩm bán chạy
+    const topProductsWs = XLSX.utils.json_to_sheet(data.topProducts.map((item, index) => ({
+      '#': index + 1,
+      'Tên sản phẩm': item.productName,
+      'Số lượng bán': item.totalQuantitySold,
+      'Doanh thu': item.totalRevenue,
+    })));
+    XLSX.utils.book_append_sheet(wb, topProductsWs, "Top sản phẩm bán chạy");
+
+    // Sheet 4: Doanh thu theo danh mục
+    const categorySalesWs = XLSX.utils.json_to_sheet(data.salesByCategory.map(item => ({
+      'Tên danh mục': item.categoryName,
+      'Số lượng bán': item.totalQuantity,
+      'Doanh thu': item.totalRevenue,
+    })));
+    XLSX.utils.book_append_sheet(wb, categorySalesWs, "Doanh thu theo danh mục");
+
+    XLSX.writeFile(wb, `Bao_cao_ban_hang_${date}.xlsx`);
+  };
+
+  const exportInventoryReport = (data: InventoryStatistics, date: string) => {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Tổng quan tồn kho
+    const summaryData = [
+      ["Báo cáo tồn kho ngày", date],
+      [],
+      ["Chỉ số", "Giá trị"],
+      ["Tổng số loại sản phẩm", data.totalProducts],
+      ["Sản phẩm sắp hết hàng (< 10)", data.lowStockProducts],
+      ["Sản phẩm đã hết hàng", data.outOfStockProducts],
+      ["Tổng giá trị tồn kho", data.totalInventoryValue],
+    ];
+    const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, summaryWs, "Tổng quan tồn kho");
+
+    // Sheet 2: Sản phẩm sắp hết hàng
+    const lowStockWs = XLSX.utils.json_to_sheet(data.lowStockItems.map(item => ({
+      'Tên sản phẩm': item.productName,
+      'Tồn kho hiện tại': item.currentStock,
+      'Kho hàng': item.warehouseName,
+      'Giá bán': item.price,
+    })));
+    XLSX.utils.book_append_sheet(wb, lowStockWs, "Sản phẩm sắp hết hàng");
+
+    // Sheet 3: Tồn kho theo kho
+    const stockByWarehouseWs = XLSX.utils.json_to_sheet(data.stockByWarehouse.map(item => ({
+      'Tên kho': item.warehouseName,
+      'Số loại sản phẩm': item.totalProducts,
+      'Tổng số lượng': item.totalQuantity,
+      'Tổng giá trị': item.totalValue,
+    })));
+    XLSX.utils.book_append_sheet(wb, stockByWarehouseWs, "Tồn kho theo kho");
+
+    XLSX.writeFile(wb, `Bao_cao_ton_kho_${date}.xlsx`);
+  };
+
+  const exportCustomerReport = (data: CustomerStatistics, date: string) => {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Tổng quan khách hàng
+    const summaryData = [
+      ["Báo cáo khách hàng ngày", date],
+      [],
+      ["Chỉ số", "Giá trị"],
+      ["Tổng khách hàng", data.totalCustomers],
+      ["Khách hàng mới (tháng này)", data.newCustomersThisMonth],
+      ["Khách hàng tích cực", data.activeCustomers],
+    ];
+    const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, summaryWs, "Tổng quan khách hàng");
+
+    // Sheet 2: Top khách hàng
+    const topCustomersWs = XLSX.utils.json_to_sheet(data.topCustomers.map((item, index) => ({
+      '#': index + 1,
+      'Tên khách hàng': item.customerName,
+      'Số điện thoại': item.phone,
+      'Email': item.email,
+      'Số đơn hàng': item.totalOrders,
+      'Tổng chi tiêu': item.totalSpent,
+    })));
+    XLSX.utils.book_append_sheet(wb, topCustomersWs, "Top khách hàng");
+
+    XLSX.writeFile(wb, `Bao_cao_khach_hang_${date}.xlsx`);
+  };
+
+
   return (
     <div style={{ padding: "24px" }}>
       <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -105,11 +240,12 @@ const StatisticsPage: React.FC = () => {
           <Button type="primary" onClick={fetchReports} loading={loading}>
             Tải báo cáo
           </Button>
-          <Button icon={<DownloadOutlined />}>Xuất Excel</Button>
+          <Button icon={<DownloadOutlined />} onClick={handleExportExcel} >Xuất Excel</Button>
         </Space>
       </div>
 
-      <Tabs defaultActiveKey="sales">
+      
+      <Tabs defaultActiveKey="sales" onChange={(key) => setActiveTab(key)}>  {/* cập nhật state active tab */}
         {/* Sales Report Tab */}
         <TabPane tab="💰 Báo cáo bán hàng" key="sales">
           {salesReport && (
@@ -200,6 +336,7 @@ const StatisticsPage: React.FC = () => {
                           stroke="#82ca9d"
                           name="Số đơn hàng"
                           strokeWidth={2}
+
                         />
                       </LineChart>
                     </ResponsiveContainer>

@@ -47,7 +47,7 @@ interface CreateOrderModalProps {
   onAddCustomer: () => void;
 }
 
-const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
+const CreateOrderModal = ({
   visible,
   customers,
   products,
@@ -56,7 +56,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onClose,
   onSuccess,
   onAddCustomer,
-}) => {
+}: CreateOrderModalProps): JSX.Element => {
   const [form] = Form.useForm();
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [inputMode, setInputMode] = useState<"manual" | "barcode">("manual");
@@ -256,10 +256,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         } else {
           discount = promotion.discountValue;
         }
-      } else if (
-        promotion.applyType === "product" ||
-        promotion.applyType === "combo"
-      ) {
+      } else if (promotion.applyType === "product") {
         // Áp dụng cho sản phẩm cụ thể
         if (promotion.products && promotion.products.length > 0) {
           const applicableProductIds = promotion.products.map(
@@ -275,6 +272,31 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               }
             }
           });
+        }
+      } else if (promotion.applyType === "combo") {
+        // Áp dụng giảm giá cho combo sản phẩm
+        if (promotion.products && promotion.products.length > 0) {
+          const applicableProductIds = promotion.products.map(
+            (p) => p.productId
+          );
+
+          // Tính tổng tiền của các sản phẩm áp dụng
+          let applicableSubtotal = 0;
+          orderItems.forEach((item) => {
+            if (applicableProductIds.includes(item.productId)) {
+              applicableSubtotal += item.totalPrice;
+            }
+          });
+
+          // Áp dụng giảm giá cho tổng tiền áp dụng
+          if (promotion.discountType === "percent") {
+            discount = applicableSubtotal * (promotion.discountValue / 100);
+          } else {
+            discount = promotion.discountValue;
+          }
+
+          // Giới hạn giảm giá không vượt quá tổng tiền áp dụng
+          discount = Math.min(discount, applicableSubtotal);
         }
       }
     }

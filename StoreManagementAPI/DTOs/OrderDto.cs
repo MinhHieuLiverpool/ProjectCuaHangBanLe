@@ -42,6 +42,8 @@ namespace StoreManagementAPI.DTOs
         public int Quantity { get; set; }
         public decimal Price { get; set; }
         public decimal Subtotal { get; set; }
+        public decimal DiscountAmount { get; set; }
+        public decimal DiscountPercent { get; set; }
     }
 
     public class PaymentDto

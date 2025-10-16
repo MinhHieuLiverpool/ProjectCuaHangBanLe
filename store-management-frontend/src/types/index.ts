@@ -123,6 +123,8 @@ export interface OrderItemResponse {
   quantity: number;
   price: number;
   subtotal: number;
+  discountAmount: number;
+  discountPercent: number;
 }
 
 export interface OrderResponse {

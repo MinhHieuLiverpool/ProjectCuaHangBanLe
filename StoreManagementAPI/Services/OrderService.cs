@@ -196,48 +196,91 @@ namespace StoreManagementAPI.Services
                                 }
                                 order.DiscountAmount = discount;
                             }
+                            else if (promotion.ApplyType == "product")
+                            {
+                                // Apply discount to specific products
+                                var applicableProductIds = promotion.PromotionProducts.Select(pp => pp.ProductId).ToList();
+
+                                foreach (var item in orderItems)
+                                {
+                                    if (item.ProductId.HasValue && applicableProductIds.Contains(item.ProductId.Value))
+                                    {
+                                        decimal itemDiscount = 0;
+                                        if (promotion.DiscountType == "percent")
+                                        {
+                                            itemDiscount = item.Subtotal * (promotion.DiscountValue / 100);
+                                        }
+                                        else // fixed
+                                        {
+                                            itemDiscount = Math.Min(promotion.DiscountValue, item.Subtotal);
+                                        }
+
+                                        item.Subtotal -= itemDiscount;
+                                        discount += itemDiscount;
+                                    }
+                                }
+
+                                order.DiscountAmount = discount;
+                                // TotalAmount is already calculated from items (already discounted)
+                                order.TotalAmount = orderItems.Sum(i => i.Subtotal);
+                            }
                             else if (promotion.ApplyType == "combo")
                             {
-                                // Apply to multiple products at once - if order has at least one of the selected products,
-                                // apply discount to ALL selected products in the order
+                                // Apply discount to the total of applicable products
                                 var applicableProductIds = promotion.PromotionProducts.Select(pp => pp.ProductId).ToList();
-                                
+
                                 // Check if order has at least one product from the applicable list
-                                bool hasApplicableProduct = orderItems.Any(item => 
+                                bool hasApplicableProduct = orderItems.Any(item =>
                                     item.ProductId.HasValue && applicableProductIds.Contains(item.ProductId.Value));
-                                
+
                                 if (hasApplicableProduct)
                                 {
-                                    // Apply discount to ALL applicable products in the order
+                                    // Calculate total applicable subtotal
+                                    decimal applicableSubtotal = 0;
                                     foreach (var item in orderItems)
                                     {
                                         if (item.ProductId.HasValue && applicableProductIds.Contains(item.ProductId.Value))
                                         {
-                                            decimal itemDiscount = 0;
-                                            if (promotion.DiscountType == "percent")
+                                            applicableSubtotal += item.Subtotal;
+                                        }
+                                    }
+
+                                    // Apply discount to the applicable subtotal
+                                    if (promotion.DiscountType == "percent")
+                                    {
+                                        discount = applicableSubtotal * (promotion.DiscountValue / 100);
+                                    }
+                                    else // fixed
+                                    {
+                                        discount = promotion.DiscountValue;
+                                    }
+
+                                    // Cap discount at applicable subtotal
+                                    discount = Math.Min(discount, applicableSubtotal);
+
+                                    // Distribute discount proportionally to applicable items
+                                    if (discount > 0)
+                                    {
+                                        foreach (var item in orderItems)
+                                        {
+                                            if (item.ProductId.HasValue && applicableProductIds.Contains(item.ProductId.Value))
                                             {
-                                                itemDiscount = item.Subtotal * (promotion.DiscountValue / 100);
+                                                decimal proportion = item.Subtotal / applicableSubtotal;
+                                                decimal itemDiscount = discount * proportion;
+                                                item.Subtotal -= itemDiscount;
                                             }
-                                            else // fixed
-                                            {
-                                                itemDiscount = promotion.DiscountValue;
-                                            }
-                                            
-                                            // Cap discount at item subtotal
-                                            itemDiscount = Math.Min(itemDiscount, item.Subtotal);
-                                            discount += itemDiscount;
+                                            // Non-applicable items keep original subtotal (discount = 0)
                                         }
                                     }
                                 }
-                                
+
                                 order.DiscountAmount = discount;
+                                // TotalAmount is already calculated from items (already discounted)
+                                order.TotalAmount = orderItems.Sum(i => i.Subtotal);
                             }
-                            
+
                             order.PromoId = promotion.PromoId;
                             promotion.UsedCount++;
-                            
-                            // Update total amount after discount
-                            order.TotalAmount = totalAmount - discount;
                             
                             Console.WriteLine($"[DEBUG] Applied discount: {discount}, New TotalAmount: {order.TotalAmount}, PromoId: {order.PromoId}");
                         }
@@ -341,22 +384,29 @@ namespace StoreManagementAPI.Services
                 UserName = order.User?.FullName,
                 OrderDate = order.OrderDate,
                 Status = order.Status,
-                TotalAmount = order.TotalAmount,
+                TotalAmount = order.TotalAmount + order.DiscountAmount, // Subtotal before discount
                 DiscountAmount = order.DiscountAmount,
-                FinalAmount = order.TotalAmount - order.DiscountAmount,
+                FinalAmount = order.TotalAmount, // TotalAmount is already final amount after discount
                 PaymentMethod = payment?.PaymentMethod,
                 PaymentDate = payment?.PaymentDate,
                 PromoId = order.PromoId,
                 PromoCode = order.Promotion?.PromoCode,
                 PromoType = order.Promotion?.ApplyType,
                 PromoDescription = order.Promotion != null ? $"{order.Promotion.PromoCode} - {GetApplyTypeDescription(order.Promotion.ApplyType)}" : null,
-                Items = order.OrderItems.Select(oi => new OrderItemResponseDto
-                {
-                    ProductId = oi.ProductId ?? 0,
-                    ProductName = oi.Product?.ProductName ?? "",
-                    Quantity = oi.Quantity,
-                    Price = oi.Price,
-                    Subtotal = oi.Subtotal
+                Items = order.OrderItems.Select(oi => {
+                    decimal originalSubtotal = oi.Quantity * oi.Price;
+                    decimal discountAmount = originalSubtotal - oi.Subtotal;
+                    decimal discountPercent = discountAmount > 0 ? (discountAmount / originalSubtotal) * 100 : 0;
+                    return new OrderItemResponseDto
+                    {
+                        ProductId = oi.ProductId ?? 0,
+                        ProductName = oi.Product?.ProductName ?? "",
+                        Quantity = oi.Quantity,
+                        Price = oi.Price,
+                        Subtotal = oi.Subtotal,
+                        DiscountAmount = discountAmount,
+                        DiscountPercent = discountPercent
+                    };
                 }).ToList()
             };
         }
@@ -382,22 +432,29 @@ namespace StoreManagementAPI.Services
                 UserName = order.User?.FullName,
                 OrderDate = order.OrderDate,
                 Status = order.Status,
-                TotalAmount = order.TotalAmount,
+                TotalAmount = order.TotalAmount + order.DiscountAmount, // Subtotal before discount
                 DiscountAmount = order.DiscountAmount,
-                FinalAmount = order.TotalAmount - order.DiscountAmount,
+                FinalAmount = order.TotalAmount, // TotalAmount is already final amount after discount
                 PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
                 PaymentDate = order.Payments.FirstOrDefault()?.PaymentDate,
                 PromoId = order.PromoId,
                 PromoCode = order.Promotion?.PromoCode,
                 PromoType = order.Promotion?.ApplyType,
                 PromoDescription = order.Promotion != null ? $"{order.Promotion.PromoCode} - {GetApplyTypeDescription(order.Promotion.ApplyType)}" : null,
-                Items = order.OrderItems.Select(oi => new OrderItemResponseDto
-                {
-                    ProductId = oi.ProductId ?? 0,
-                    ProductName = oi.Product?.ProductName ?? "",
-                    Quantity = oi.Quantity,
-                    Price = oi.Price,
-                    Subtotal = oi.Subtotal
+                Items = order.OrderItems.Select(oi => {
+                    decimal originalSubtotal = oi.Quantity * oi.Price;
+                    decimal discountAmount = originalSubtotal - oi.Subtotal;
+                    decimal discountPercent = discountAmount > 0 ? (discountAmount / originalSubtotal) * 100 : 0;
+                    return new OrderItemResponseDto
+                    {
+                        ProductId = oi.ProductId ?? 0,
+                        ProductName = oi.Product?.ProductName ?? "",
+                        Quantity = oi.Quantity,
+                        Price = oi.Price,
+                        Subtotal = oi.Subtotal,
+                        DiscountAmount = discountAmount,
+                        DiscountPercent = discountPercent
+                    };
                 }).ToList()
             });
         }

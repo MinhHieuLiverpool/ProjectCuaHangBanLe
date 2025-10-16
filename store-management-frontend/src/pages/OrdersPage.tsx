@@ -357,12 +357,15 @@ const OrdersPage: React.FC = () => {
                 <th>Số lượng</th>
                 <th>Đơn giá</th>
                 <th>Thành tiền</th>
+                <th>Giảm giá</th>
               </tr>
             </thead>
             <tbody>
               ${order.items
-                .map(
-                  (item) => `
+                .map((item) => {
+                  const originalTotal = item.price * item.quantity;
+                  const hasDiscount = item.discountAmount && item.discountAmount > 0;
+                  return `
                 <tr>
                   <td>${item.productName}</td>
                   <td>${item.quantity}</td>
@@ -370,13 +373,39 @@ const OrdersPage: React.FC = () => {
                     style: "currency",
                     currency: "VND",
                   }).format(item.price)}</td>
-                  <td>${new Intl.NumberFormat("vi-VN", {
-                    style: "currency",
-                    currency: "VND",
-                  }).format(item.subtotal)}</td>
+                  <td>
+                    ${
+                      hasDiscount
+                        ? `<span style="text-decoration: line-through; color: #999;">${new Intl.NumberFormat(
+                            "vi-VN",
+                            {
+                              style: "currency",
+                              currency: "VND",
+                            }
+                          ).format(originalTotal)}</span><br/>`
+                        : ""
+                    }
+                    <strong>${new Intl.NumberFormat("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
+                    }).format(item.subtotal)}</strong>
+                  </td>
+                  <td style="color: ${hasDiscount ? '#e74c3c' : '#999'}; font-weight: ${hasDiscount ? 'bold' : 'normal'};">
+                    ${
+                      hasDiscount
+                        ? `<div style="color: #e74c3c; font-weight: bold;">-${new Intl.NumberFormat("vi-VN", {
+                            style: "currency",
+                            currency: "VND",
+                          }).format(item.discountAmount)}</div>
+                      <small style="color: #52c41a;">(${item.discountPercent.toFixed(
+                        1
+                      )}%)</small>`
+                        : `<span style="color: #999;">0đ</span>`
+                    }
+                  </td>
                 </tr>
-              `
-                )
+              `;
+                })
                 .join("")}
             </tbody>
           </table>
@@ -1024,7 +1053,20 @@ const OrdersPage: React.FC = () => {
 
             <Divider />
             <Table
-              dataSource={selectedOrder.items}
+              dataSource={selectedOrder.items?.map((item: any) => {
+                // Nếu item không có discountAmount, tính toán lại từ order discount
+                if ((!item.discountAmount || item.discountAmount === 0) && selectedOrder.discountAmount > 0) {
+                  const originalTotal = item.price * item.quantity;
+                  const calculatedDiscount = originalTotal - item.subtotal;
+                  const calculatedPercent = calculatedDiscount > 0 ? (calculatedDiscount / originalTotal) * 100 : 0;
+                  return {
+                    ...item,
+                    discountAmount: calculatedDiscount,
+                    discountPercent: calculatedPercent
+                  };
+                }
+                return item;
+              })}
               columns={[
                 {
                   title: "Sản phẩm",
@@ -1043,8 +1085,30 @@ const OrdersPage: React.FC = () => {
                   title: "Thành tiền",
                   dataIndex: "subtotal",
                   key: "subtotal",
-                  render: (price: number) =>
-                    `${(price || 0).toLocaleString("vi-VN")}đ`,
+                  render: (subtotal: number, record: any) => {
+                    const originalTotal = record.price * record.quantity;
+                    return (
+                      <div>
+                        <div
+                          style={{
+                            textDecoration:
+                              record.discountAmount > 0
+                                ? "line-through"
+                                : "none",
+                            color:
+                              record.discountAmount > 0 ? "#999" : "inherit",
+                          }}
+                        >
+                          {originalTotal.toLocaleString("vi-VN")}đ
+                        </div>
+                        {record.discountAmount > 0 && (
+                          <div style={{ color: "#e74c3c", fontWeight: "bold" }}>
+                            {subtotal.toLocaleString("vi-VN")}đ
+                          </div>
+                        )}
+                      </div>
+                    );
+                  },
                 },
               ]}
               rowKey="productId"
@@ -1057,12 +1121,50 @@ const OrdersPage: React.FC = () => {
                 Tổng tiền:{" "}
                 {(selectedOrder.totalAmount || 0).toLocaleString("vi-VN")}đ
               </p>
-              {selectedOrder.discountAmount > 0 && (
-                <p>
-                  Giảm giá: -
-                  {(selectedOrder.discountAmount || 0).toLocaleString("vi-VN")}đ
-                </p>
-              )}
+              {selectedOrder.discountAmount > 0 && (() => {
+                // Lấy thông tin promotion để biết loại và sản phẩm áp dụng
+                const promotion = selectedOrder.promoId
+                  ? promotions.find((p) => p.promoId === selectedOrder.promoId)
+                  : null;
+
+                let discountText = "";
+
+                if (promotion) {
+                  if (promotion.applyType === "order") {
+                    // Giảm theo đơn hàng - không liệt kê sản phẩm
+                    const percent = ((selectedOrder.discountAmount / selectedOrder.totalAmount) * 100);
+                    discountText = `(Giảm ${percent.toFixed(0)}% cho toàn bộ đơn hàng)`;
+                  } else if (promotion.applyType === "product" || promotion.applyType === "combo") {
+                    // Giảm theo sản phẩm hoặc combo - liệt kê sản phẩm áp dụng
+                    const applicableProducts = promotion.products || [];
+
+                    // Tìm sản phẩm trong đơn hàng có trong danh sách áp dụng
+                    const discountedItems = selectedOrder.items?.filter((item: any) =>
+                      applicableProducts.some((p) => p.productId === item.productId)
+                    );
+
+                    if (discountedItems && discountedItems.length > 0) {
+                      // Tính % giảm giá trung bình
+                      const totalApplicable = discountedItems.reduce((sum: number, item: any) =>
+                        sum + (item.price * item.quantity), 0);
+                      const percent = ((selectedOrder.discountAmount / totalApplicable) * 100);
+
+                      const productNames = discountedItems.map((item: any) => item.productName).join(", ");
+                      discountText = `(Giảm ${percent.toFixed(0)}% cho ${productNames})`;
+                    }
+                  }
+                }
+
+                return (
+                  <p>
+                    Giảm giá: -
+                    {(selectedOrder.discountAmount || 0).toLocaleString("vi-VN")}đ{" "}
+                    <span style={{ color: "#52c41a", fontSize: "13px" }}>
+                      {discountText}
+                    </span>
+                  </p>
+                );
+              })()}
               <h3>
                 Thành tiền:{" "}
                 {(selectedOrder.finalAmount || 0).toLocaleString("vi-VN")}đ

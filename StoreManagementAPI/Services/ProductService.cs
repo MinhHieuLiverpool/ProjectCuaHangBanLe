@@ -74,6 +74,7 @@ namespace StoreManagementAPI.Services
                 .Include(p => p.Category)
                 .Include(p => p.Supplier)
                 .Include(p => p.Inventories)
+                .Include(p => p.OrderItems)
                 .ToListAsync();
 
             return products.Select(p => new ProductDto
@@ -89,7 +90,8 @@ namespace StoreManagementAPI.Services
                 CostPrice = p.CostPrice,
                 Unit = p.Unit,
                 Status = p.Status,
-                StockQuantity = p.Inventories?.Sum(i => i.Quantity) ?? 0
+                StockQuantity = p.Inventories?.Sum(i => i.Quantity) ?? 0,
+                HasOrders = p.OrderItems != null && p.OrderItems.Any()
             });
         }
 
@@ -106,6 +108,7 @@ namespace StoreManagementAPI.Services
                 .Include(p => p.Category)
                 .Include(p => p.Supplier)
                 .Include(p => p.Inventories)
+                .Include(p => p.OrderItems)
                 .Where(p =>
                     p.ProductName.ToLower().Contains(searchTerm) ||
                     (p.Barcode != null && p.Barcode.ToLower().Contains(searchTerm)) ||
@@ -126,7 +129,8 @@ namespace StoreManagementAPI.Services
                 CostPrice = p.CostPrice,
                 Unit = p.Unit,
                 Status = p.Status,
-                StockQuantity = p.Inventories?.Sum(i => i.Quantity) ?? 0
+                StockQuantity = p.Inventories?.Sum(i => i.Quantity) ?? 0,
+                HasOrders = p.OrderItems != null && p.OrderItems.Any()
             });
         }
 
@@ -136,6 +140,7 @@ namespace StoreManagementAPI.Services
                 .Include(p => p.Category)
                 .Include(p => p.Supplier)
                 .Include(p => p.Inventories)
+                .Include(p => p.OrderItems)
                 .FirstOrDefaultAsync(p => p.ProductId == id);
 
             if (product == null) return null;
@@ -153,7 +158,8 @@ namespace StoreManagementAPI.Services
                 CostPrice = product.CostPrice,
                 Unit = product.Unit,
                 Status = product.Status,
-                StockQuantity = product.Inventories?.Sum(i => i.Quantity) ?? 0
+                StockQuantity = product.Inventories?.Sum(i => i.Quantity) ?? 0,
+                HasOrders = product.OrderItems != null && product.OrderItems.Any()
             };
         }
 
@@ -168,6 +174,7 @@ namespace StoreManagementAPI.Services
                 .Include(p => p.Category)
                 .Include(p => p.Supplier)
                 .Include(p => p.Inventories)
+                .Include(p => p.OrderItems)
                 .FirstOrDefaultAsync(p => p.Barcode == barcode.Trim());
 
             if (product == null) return null;
@@ -185,7 +192,8 @@ namespace StoreManagementAPI.Services
                 CostPrice = product.CostPrice,
                 Unit = product.Unit,
                 Status = product.Status,
-                StockQuantity = product.Inventories?.Sum(i => i.Quantity) ?? 0
+                StockQuantity = product.Inventories?.Sum(i => i.Quantity) ?? 0,
+                HasOrders = product.OrderItems != null && product.OrderItems.Any()
             };
         }
 
@@ -208,7 +216,7 @@ namespace StoreManagementAPI.Services
                     ProductName = dto.ProductName,
                     Barcode = dto.Barcode,
                     Price = dto.Price,
-                    CostPrice = dto.CostPrice,
+                    CostPrice = 0, // Giá nhập sẽ được cập nhật khi nhập hàng
                     Unit = dto.Unit,
                     CreatedAt = DateTime.Now
                 };
@@ -273,33 +281,52 @@ namespace StoreManagementAPI.Services
 
         private async Task<string> GenerateNextBarcodeAsync()
         {
-            // Lấy barcode lớn nhất hiện tại với prefix 890
-            var maxBarcode = await _context.Products
-                .Where(p => p.Barcode != null && p.Barcode.StartsWith("890") && p.Barcode.Length == 13)
-                .Select(p => p.Barcode)
-                .OrderByDescending(b => b)
-                .FirstOrDefaultAsync();
+            // Tạo EAN13 ngẫu nhiên bắt đầu từ 890, không trùng
+            string barcode;
+            var random = new Random();
+            int attempts = 0;
+            const int maxAttempts = 1000; // Tránh vòng lặp vô hạn
 
-            long nextNumber;
-            if (maxBarcode == null)
+            do
             {
-                // Bắt đầu từ 8900000000001
-                nextNumber = 8900000000001;
+                // Tạo 9 chữ số ngẫu nhiên sau 890
+                string randomPart = "";
+                for (int i = 0; i < 9; i++)
+                {
+                    randomPart += random.Next(0, 10).ToString();
+                }
+
+                string baseBarcode = "890" + randomPart; // 12 chữ số
+
+                // Tính checksum EAN13
+                int checksum = CalculateEAN13Checksum(baseBarcode);
+                barcode = baseBarcode + checksum.ToString();
+
+                attempts++;
+                if (attempts >= maxAttempts)
+                {
+                    throw new Exception("Không thể tạo mã barcode duy nhất sau nhiều lần thử.");
+                }
             }
-            else
+            while (await _context.Products.AnyAsync(p => p.Barcode == barcode));
+
+            return barcode;
+        }
+
+        private int CalculateEAN13Checksum(string barcode12)
+        {
+            if (barcode12.Length != 12)
+                throw new ArgumentException("Barcode phải có 12 chữ số để tính checksum.");
+
+            int sum = 0;
+            for (int i = 0; i < 12; i++)
             {
-                // Tăng lên 1
-                if (long.TryParse(maxBarcode, out long currentNumber))
-                {
-                    nextNumber = currentNumber + 1;
-                }
-                else
-                {
-                    nextNumber = 8900000000001;
-                }
+                int digit = int.Parse(barcode12[i].ToString());
+                sum += (i % 2 == 0) ? digit * 1 : digit * 3;
             }
 
-            return nextNumber.ToString("D13"); // Format 13 chữ số
+            int checksum = (10 - (sum % 10)) % 10;
+            return checksum;
         }
 
         public async Task<ProductDto?> UpdateProductAsync(int id, UpdateProductDto dto)

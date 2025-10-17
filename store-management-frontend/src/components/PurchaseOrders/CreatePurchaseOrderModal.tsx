@@ -14,6 +14,7 @@ import {
   Input,
   Radio,
   Space,
+  Tooltip,
 } from "antd";
 import {
   DeleteOutlined,
@@ -34,6 +35,7 @@ interface Product {
   barcode?: string;
   costPrice?: number;
   unit?: string;
+  stockQuantity?: number;
 }
 
 interface PurchaseItem {
@@ -108,12 +110,8 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderModalProps> = ({
   };
 
   const handleProductChange = (productId: number) => {
-    const product = products.find((p) => p.productId === productId);
-    if (product && product.costPrice) {
-      form.setFieldsValue({ costPrice: product.costPrice });
-    } else {
-      form.setFieldsValue({ costPrice: 0 });
-    }
+    // Không tự động điền giá nhập vì mỗi lần nhập hàng giá có thể khác nhau
+    // Người dùng tự nhập giá nhập cho từng lần
   };
 
   const handleAddItem = () => {
@@ -445,27 +443,84 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderModalProps> = ({
 
           {inputMode === "manual" ? (
             <Row gutter={8}>
-              <Col span={10}>
+              <Col span={12}>
                 <Form.Item name="productId" noStyle>
                   <Select
-                    placeholder="Chọn sản phẩm"
+                    placeholder="Chọn sản phẩm (tìm theo tên hoặc mã vạch)"
                     showSearch
                     onChange={handleProductChange}
-                    filterOption={(input, option) =>
-                      (option?.label ?? "")
-                        .toLowerCase()
-                        .includes(input.toLowerCase())
-                    }
-                    options={products.map((p) => ({
-                      value: p.productId,
-                      label: `${p.productName} ${
-                        p.barcode ? `(${p.barcode})` : ""
-                      }`,
-                    }))}
-                  />
+                    dropdownStyle={{ minWidth: 500 }}
+                    style={{ width: "100%" }}
+                    filterOption={(input, option) => {
+                      const searchText = input.toLowerCase();
+                      const product = products.find(
+                        (p) => p.productId === option?.value
+                      );
+                      if (!product) return false;
+
+                      return (
+                        product.productName.toLowerCase().includes(searchText) ||
+                        (product.barcode &&
+                          product.barcode.toLowerCase().includes(searchText))
+                      );
+                    }}
+                    optionLabelProp="label"
+                  >
+                    {products.map((p) => (
+                      <Select.Option
+                        key={p.productId}
+                        value={p.productId}
+                        label={p.productName}
+                      >
+                        <Tooltip
+                          title={p.productName}
+                          placement="topLeft"
+                          mouseEnterDelay={0.5}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontWeight: 500,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {p.productName}
+                              </div>
+                              {p.barcode && (
+                                <div style={{ color: "#888", fontSize: "12px" }}>
+                                  <BarcodeOutlined /> {p.barcode}
+                                </div>
+                              )}
+                            </div>
+                            <span
+                              style={{
+                                color:
+                                  (p.stockQuantity || 0) < 10 ? "#ff4d4f" : "#52c41a",
+                                fontWeight: "bold",
+                                fontSize: "12px",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Tồn: {p.stockQuantity || 0}
+                            </span>
+                          </div>
+                        </Tooltip>
+                      </Select.Option>
+                    ))}
+                  </Select>
                 </Form.Item>
               </Col>
-              <Col span={5}>
+              <Col span={4}>
                 <Form.Item name="quantity" noStyle initialValue={1}>
                   <InputNumber
                     placeholder="Số lượng"
@@ -474,15 +529,17 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderModalProps> = ({
                   />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col span={5}>
                 <Form.Item name="costPrice" noStyle>
                   <InputNumber
                     placeholder="Giá nhập"
                     min={0}
-                    disabled
                     style={{ width: "100%" }}
                     formatter={(value) =>
                       `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                    }
+                    parser={(value) =>
+                      value ? parseFloat(value.replace(/,/g, "")) : 0
                     }
                   />
                 </Form.Item>

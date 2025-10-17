@@ -14,6 +14,7 @@ namespace StoreManagementAPI.DTOs
         public string Unit { get; set; } = "pcs";
         public string Status { get; set; } = "active";
         public int? StockQuantity { get; set; }
+        public bool HasOrders { get; set; } // True nếu sản phẩm đã được bán
     }
 
     public class ProductSimpleDto
@@ -30,9 +31,8 @@ namespace StoreManagementAPI.DTOs
         public string ProductName { get; set; } = string.Empty;
         public string? Barcode { get; set; }
         public decimal Price { get; set; }
-        public decimal CostPrice { get; set; } = 0;
         public string Unit { get; set; } = "pcs";
-        public int InitialStock { get; set; } = 0;
+        // CostPrice được cập nhật khi nhập hàng, không cần thiết khi tạo sản phẩm
     }
 
     public class UpdateProductDto

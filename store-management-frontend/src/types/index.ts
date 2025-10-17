@@ -32,6 +32,7 @@ export interface Product {
   unit: string;
   status: string; // active || inactive
   stockQuantity?: number;
+  hasOrders?: boolean; // True nếu sản phẩm đã được bán
 }
 
 export interface CreateProductDto {
@@ -40,8 +41,8 @@ export interface CreateProductDto {
   productName: string;
   barcode?: string;
   price: number;
-  costPrice: number;
   unit: string;
+  // costPrice được cập nhật khi nhập hàng
 }
 
 export interface ProductHistory {

@@ -20,6 +20,7 @@ import {
   message,
   Modal,
   Popconfirm,
+  Radio,
   Row,
   Select,
   Space,
@@ -45,7 +46,9 @@ const ProductsPage: React.FC = () => {
   const [searchText, setSearchText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
+  const [barcodeMode, setBarcodeMode] = useState<"auto" | "manual">("auto");
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -54,7 +57,14 @@ const ProductsPage: React.FC = () => {
 
   useEffect(() => {
     filterProducts();
-  }, [products, searchText, selectedCategory, selectedSupplier, priceRange]);
+  }, [
+    products,
+    searchText,
+    selectedCategory,
+    selectedSupplier,
+    selectedStatus,
+    priceRange,
+  ]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -119,18 +129,73 @@ const ProductsPage: React.FC = () => {
       });
     }
 
+    // Filter by status
+    if (selectedStatus) {
+      if (selectedStatus === "active") {
+        filtered = filtered.filter(
+          (p) => p.status === "active" && (p.stockQuantity || 0) > 0
+        );
+      } else if (selectedStatus === "out_of_stock") {
+        filtered = filtered.filter((p) => (p.stockQuantity || 0) === 0);
+      } else if (selectedStatus === "inactive") {
+        filtered = filtered.filter((p) => p.status === "inactive");
+      }
+    }
+
     setFilteredProducts(filtered);
+  };
+
+  const generateEAN13Barcode = () => {
+    // Tạo 9 chữ số ngẫu nhiên sau 890
+    let randomPart = "";
+    for (let i = 0; i < 9; i++) {
+      randomPart += Math.floor(Math.random() * 10).toString();
+    }
+
+    const baseBarcode = "890" + randomPart; // 12 chữ số
+
+    // Tính checksum EAN13
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      const digit = parseInt(baseBarcode[i]);
+      sum += i % 2 === 0 ? digit * 1 : digit * 3;
+    }
+
+    const checksum = (10 - (sum % 10)) % 10;
+    return baseBarcode + checksum.toString();
+  };
+
+  const validateEAN13 = (barcode: string): boolean => {
+    if (barcode.length !== 13 || !/^\d{13}$/.test(barcode)) {
+      return false;
+    }
+
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      const digit = parseInt(barcode[i]);
+      sum += i % 2 === 0 ? digit * 1 : digit * 3;
+    }
+
+    const checksum = (10 - (sum % 10)) % 10;
+    return parseInt(barcode[12]) === checksum;
   };
 
   const handleCreate = () => {
     setEditingProduct(null);
+    setBarcodeMode("auto");
     form.resetFields();
+    // Tạo barcode tự động
+    const barcode = generateEAN13Barcode();
+    form.setFieldsValue({ barcode });
     setModalVisible(true);
   };
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
-    form.setFieldsValue(product);
+    setBarcodeMode("auto");
+    // Tạo barcode mới khi sửa
+    const barcode = generateEAN13Barcode();
+    form.setFieldsValue({ ...product, barcode });
     setModalVisible(true);
   };
 
@@ -147,11 +212,6 @@ const ProductsPage: React.FC = () => {
 
     // Chuẩn bị dữ liệu
     const excelData = filteredProducts.map((product) => {
-      const profit = product.price - (product.costPrice || 0);
-      const profitPercent = product.costPrice
-        ? ((profit / product.costPrice) * 100).toFixed(1)
-        : "0";
-
       return {
         "Mã SP": product.productId,
         "Tên sản phẩm": product.productName,
@@ -159,12 +219,14 @@ const ProductsPage: React.FC = () => {
         "Danh mục": product.categoryName || "",
         "Nhà cung cấp": product.supplierName || "",
         "Đơn vị": product.unit,
-        "Giá nhập": product.costPrice || 0,
         "Giá bán": product.price,
-        "Lợi nhuận": profit,
-        "% Lợi nhuận": profitPercent + "%",
         "Tồn kho": product.stockQuantity || 0,
-        "Trạng thái": product.status === "active" ? "Đang bán" : "Ngừng bán",
+        "Trạng thái":
+          product.stockQuantity === 0
+            ? "Hết hàng"
+            : product.status === "active"
+            ? "Đang bán"
+            : "Ngừng bán",
       };
     });
 
@@ -179,10 +241,7 @@ const ProductsPage: React.FC = () => {
       { wch: 15 }, // Danh mục
       { wch: 20 }, // Nhà cung cấp
       { wch: 10 }, // Đơn vị
-      { wch: 12 }, // Giá nhập
       { wch: 12 }, // Giá bán
-      { wch: 12 }, // Lợi nhuận
-      { wch: 12 }, // % Lợi nhuận
       { wch: 10 }, // Tồn kho
       { wch: 12 }, // Trạng thái
     ];
@@ -205,6 +264,7 @@ const ProductsPage: React.FC = () => {
     setSearchText("");
     setSelectedCategory(null);
     setSelectedSupplier(null);
+    setSelectedStatus(null);
     setPriceRange(null);
   };
 
@@ -265,6 +325,8 @@ const ProductsPage: React.FC = () => {
       dataIndex: "productId",
       key: "productId",
       width: 80,
+      defaultSortOrder: "descend" as const,
+      sorter: (a: Product, b: Product) => a.productId - b.productId,
     },
     {
       title: "Tên sản phẩm",
@@ -284,36 +346,12 @@ const ProductsPage: React.FC = () => {
       width: 150,
     },
     {
-      title: "Giá nhập",
-      dataIndex: "costPrice",
-      key: "costPrice",
-      width: 120,
-      render: (costPrice: number) =>
-        costPrice ? `${(costPrice || 0).toLocaleString("vi-VN")}đ` : "0đ",
-    },
-    {
       title: "Giá bán",
       dataIndex: "price",
       key: "price",
       width: 120,
       render: (price: number) =>
         price ? `${(price || 0).toLocaleString("vi-VN")}đ` : "0đ",
-    },
-    {
-      title: "Lợi nhuận",
-      key: "profit",
-      width: 100,
-      render: (_: any, record: Product) => {
-        const profit = record.price - (record.costPrice || 0);
-        const profitPercent = record.costPrice
-          ? ((profit / record.costPrice) * 100).toFixed(1)
-          : "0";
-        return (
-          <span style={{ color: profit > 0 ? "green" : "red" }}>
-            {profitPercent}%
-          </span>
-        );
-      },
     },
     {
       title: "Đơn vị",
@@ -335,11 +373,16 @@ const ProductsPage: React.FC = () => {
       dataIndex: "status",
       key: "status",
       width: 100,
-      render: (status: string) => (
-        <Tag color={status === "active" ? "green" : "red"}>
-          {status === "active" ? "Đang bán" : "Ngừng bán"}
-        </Tag>
-      ),
+      render: (status: string, record: Product) => {
+        if (record.stockQuantity === 0) {
+          return <Tag color="orange">Hết hàng</Tag>;
+        }
+        return (
+          <Tag color={status === "active" ? "green" : "red"}>
+            {status === "active" ? "Đang bán" : "Ngừng bán"}
+          </Tag>
+        );
+      },
     },
     {
       title: "Thao tác",
@@ -365,14 +408,43 @@ const ProductsPage: React.FC = () => {
             Sửa
           </Button>
           {record.status === "active" ? (
-            <Button
-              type="default"
-              size="small"
-              onClick={() => handleToggleStatus(record.productId, "inactive")}
-              style={{ color: "orange" }}
-            >
-              Ẩn
-            </Button>
+            record.hasOrders ? (
+              <Button
+                type="default"
+                size="small"
+                onClick={() => handleToggleStatus(record.productId, "inactive")}
+                style={{ color: "orange" }}
+              >
+                Ẩn
+              </Button>
+            ) : (
+              <Popconfirm
+                title={
+                  <div>
+                    <div>Bạn có chắc muốn xóa sản phẩm này?</div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "#666",
+                        marginTop: 4,
+                      }}
+                    >
+                      * Hành động này không thể hoàn tác
+                    </div>
+                  </div>
+                }
+                onConfirm={() => handleDelete(record.productId)}
+              >
+                <Button
+                  type="default"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                >
+                  Xóa
+                </Button>
+              </Popconfirm>
+            )
           ) : (
             <Button
               type="default"
@@ -383,26 +455,6 @@ const ProductsPage: React.FC = () => {
               Khôi phục
             </Button>
           )}
-          <Popconfirm
-            title={
-              <div>
-                <div>Bạn có chắc muốn xóa?</div>
-                <div style={{ fontSize: "12px", color: "#666", marginTop: 4 }}>
-                  * Sản phẩm đã bán sẽ được ẩn thay vì xóa
-                </div>
-              </div>
-            }
-            onConfirm={() => handleDelete(record.productId)}
-          >
-            <Button
-              type="default"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-            >
-              Xóa
-            </Button>
-          </Popconfirm>
         </Space>
       ),
     },
@@ -444,6 +496,14 @@ const ProductsPage: React.FC = () => {
         selectedCategory={selectedCategory}
         onCategoryChange={setSelectedCategory}
         categoryLabel="Danh mục"
+        statuses={[
+          { value: "active", label: "Đang bán" },
+          { value: "out_of_stock", label: "Hết hàng" },
+          { value: "inactive", label: "Đã ẩn" },
+        ]}
+        selectedStatus={selectedStatus}
+        onStatusChange={setSelectedStatus}
+        statusLabel="Trạng thái"
         showPriceFilter={true}
         priceRange={priceRange}
         onPriceRangeChange={setPriceRange}
@@ -512,8 +572,53 @@ const ProductsPage: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="barcode" label="Mã vạch (Barcode)">
-                <Input placeholder="Nhập mã vạch (tùy chọn)" />
+              <Form.Item label="Mã vạch (Barcode)">
+                <Radio.Group
+                  value={barcodeMode}
+                  onChange={(e) => {
+                    const mode = e.target.value;
+                    setBarcodeMode(mode);
+                    if (mode === "auto") {
+                      const barcode = generateEAN13Barcode();
+                      form.setFieldsValue({ barcode });
+                    } else {
+                      form.setFieldsValue({ barcode: "" });
+                    }
+                  }}
+                  style={{ marginBottom: 8 }}
+                >
+                  <Radio value="auto">Tự động tạo</Radio>
+                  <Radio value="manual">Nhập thủ công</Radio>
+                </Radio.Group>
+                <Form.Item
+                  name="barcode"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Vui lòng nhập mã vạch!",
+                    },
+                    {
+                      validator: (_, value) => {
+                        if (value && !validateEAN13(value)) {
+                          return Promise.reject(
+                            new Error(
+                              "Mã vạch không hợp lệ! Phải là mã EAN-13 đúng."
+                            )
+                          );
+                        }
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input
+                    placeholder={
+                      barcodeMode === "auto"
+                        ? "Mã vạch tự động tạo"
+                        : "Nhập mã vạch EAN-13"
+                    }
+                  />
+                </Form.Item>
               </Form.Item>
             </Col>
           </Row>
@@ -554,31 +659,7 @@ const ProductsPage: React.FC = () => {
           </Row>
 
           <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                name="costPrice"
-                label="Giá nhập (VNĐ)"
-                rules={[
-                  { required: true, message: "Vui lòng nhập giá nhập!" },
-                  {
-                    type: "number",
-                    min: 0,
-                    message: "Giá nhập phải lớn hơn 0!",
-                  },
-                ]}
-              >
-                <InputNumber
-                  min={0}
-                  style={{ width: "100%" }}
-                  placeholder="0"
-                  formatter={(value) =>
-                    `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                  }
-                  parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ""))}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 name="price"
                 label="Giá bán (VNĐ)"
@@ -598,11 +679,29 @@ const ProductsPage: React.FC = () => {
                   formatter={(value) =>
                     `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
                   }
-                  parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ""))}
+                  parser={(value) => {
+                    const cleaned = value!.replace(/[^0-9.]/g, "");
+                    return Number(cleaned) || 0;
+                  }}
+                  onKeyPress={(e) => {
+                    const charCode = e.which ? e.which : e.keyCode;
+                    // Cho phép: số (48-57), dấu chấm (46), backspace (8), delete (46), tab (9), enter (13), escape (27), arrow keys (37-40)
+                    if (
+                      (charCode < 48 || charCode > 57) && // không phải số
+                      charCode !== 46 && // không phải dấu chấm
+                      charCode !== 8 && // không phải backspace
+                      charCode !== 9 && // không phải tab
+                      charCode !== 13 && // không phải enter
+                      charCode !== 27 && // không phải escape
+                      !(charCode >= 37 && charCode <= 40) // không phải arrow keys
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 name="unit"
                 label="Đơn vị"
@@ -644,9 +743,17 @@ const ProductsPage: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label="Trạng thái" span={1}>
                 <Tag
-                  color={viewingProduct.status === "active" ? "green" : "red"}
+                  color={
+                    viewingProduct.stockQuantity === 0
+                      ? "orange"
+                      : viewingProduct.status === "active"
+                      ? "green"
+                      : "red"
+                  }
                 >
-                  {viewingProduct.status === "active"
+                  {viewingProduct.stockQuantity === 0
+                    ? "Hết hàng"
+                    : viewingProduct.status === "active"
                     ? "Đang bán"
                     : "Ngừng bán"}
                 </Tag>
@@ -686,53 +793,10 @@ const ProductsPage: React.FC = () => {
                 </strong>
               </Descriptions.Item>
 
-              <Descriptions.Item label="Giá nhập" span={1}>
-                <span style={{ fontSize: "15px", color: "#d32f2f" }}>
-                  {(viewingProduct.costPrice || 0).toLocaleString("vi-VN")}đ
-                </span>
-              </Descriptions.Item>
               <Descriptions.Item label="Giá bán" span={1}>
                 <span style={{ fontSize: "15px", color: "#1976d2" }}>
                   {viewingProduct.price.toLocaleString("vi-VN")}đ
                 </span>
-              </Descriptions.Item>
-
-              <Descriptions.Item label="Lợi nhuận/sản phẩm" span={1}>
-                {(() => {
-                  const profit =
-                    viewingProduct.price - (viewingProduct.costPrice || 0);
-                  return (
-                    <span
-                      style={{
-                        color: profit > 0 ? "green" : "red",
-                        fontSize: "15px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {profit.toLocaleString("vi-VN")}đ
-                    </span>
-                  );
-                })()}
-              </Descriptions.Item>
-              <Descriptions.Item label="% Lợi nhuận" span={1}>
-                {(() => {
-                  const profit =
-                    viewingProduct.price - (viewingProduct.costPrice || 0);
-                  const profitPercent = viewingProduct.costPrice
-                    ? ((profit / viewingProduct.costPrice) * 100).toFixed(1)
-                    : "0";
-                  return (
-                    <span
-                      style={{
-                        color: parseFloat(profitPercent) > 0 ? "green" : "red",
-                        fontSize: "15px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {profitPercent}%
-                    </span>
-                  );
-                })()}
               </Descriptions.Item>
             </Descriptions>
           </div>

@@ -50,6 +50,32 @@ namespace StoreManagementAPI.Controllers
             return Ok(suppliers);
         }
 
+        // Endpoint kiểm tra supplier có thể xóa hẳn không
+        [HttpGet("{id}/can-delete")]
+        public async Task<ActionResult<object>> CanDelete(int id)
+        {
+            var supplier = await _supplierRepository.GetByIdAsync(id);
+            if (supplier == null) return NotFound();
+
+            var hasProducts = await _context.Products
+                .AnyAsync(p => p.SupplierId == id && p.Status != "deleted");
+
+            var hasPurchaseOrders = await _context.PurchaseOrders
+                .AnyAsync(po => po.SupplierId == id && po.Status != "deleted");
+
+            var canHardDelete = !hasProducts && !hasPurchaseOrders;
+
+            return Ok(new
+            {
+                canHardDelete,
+                hasProducts,
+                hasPurchaseOrders,
+                message = canHardDelete
+                    ? "Có thể xóa nhà cung cấp"
+                    : "Nhà cung cấp có dữ liệu liên quan, chỉ có thể ẩn"
+            });
+        }
+
         [HttpGet("{id}")]
         // Staff và Admin đều có thể đọc chi tiết nhà cung cấp
         public async Task<ActionResult<Supplier>> GetById(int id)
@@ -143,9 +169,54 @@ namespace StoreManagementAPI.Controllers
 
             supplier.Status = "active";
             var updated = await _supplierRepository.UpdateAsync(supplier);
-            return Ok(new 
-            { 
+
+            LogAudit(
+                action: "RESTORE",
+                entity: "Supplier",
+                entityId: id,
+                entityName: supplier.Name,
+                changesSummary: $"Khôi phục nhà cung cấp: {supplier.Name}",
+                oldValues: new { Status = "inactive" },
+                newValues: new { Status = "active" }
+            );
+
+            return Ok(new
+            {
                 message = "Khôi phục nhà cung cấp thành công",
+                supplier = updated
+            });
+        }
+
+        [HttpPatch("{id}/hide")]
+        // [Authorize] - B? AUTHENTICATION // Chỉ admin mới được ẩn
+        public async Task<ActionResult> Hide(int id)
+        {
+            var supplier = await _supplierRepository.GetByIdAsync(id);
+            if (supplier == null) return NotFound();
+
+            var oldValues = new
+            {
+                supplier.SupplierId,
+                supplier.Name,
+                supplier.Status
+            };
+
+            supplier.Status = "inactive";
+            var updated = await _supplierRepository.UpdateAsync(supplier);
+
+            LogAudit(
+                action: "HIDE",
+                entity: "Supplier",
+                entityId: id,
+                entityName: supplier.Name,
+                changesSummary: $"Ẩn nhà cung cấp: {supplier.Name}",
+                oldValues: oldValues,
+                newValues: new { supplier.Status }
+            );
+
+            return Ok(new
+            {
+                message = "Đã ẩn nhà cung cấp thành công",
                 supplier = updated
             });
         }

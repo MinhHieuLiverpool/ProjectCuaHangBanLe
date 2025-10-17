@@ -232,7 +232,7 @@ const ProductsPage: React.FC = () => {
       await productService.update(productId, { status: newStatus });
       message.success(
         newStatus === "active"
-          ? "Hiển thị sản phẩm thành công!"
+          ? "Khôi phục sản phẩm thành công!"
           : "Ẩn sản phẩm thành công!"
       );
       fetchData();
@@ -380,7 +380,7 @@ const ProductsPage: React.FC = () => {
               onClick={() => handleToggleStatus(record.productId, "active")}
               style={{ color: "green" }}
             >
-              Hiện
+              Khôi phục
             </Button>
           )}
           <Popconfirm

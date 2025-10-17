@@ -152,3 +152,26 @@ export interface PaymentDto {
   amount: number;
   paymentMethod: "cash" | "card" | "bank_transfer" | "e-wallet";
 }
+
+export interface CategoryProduct {
+  productId: number;
+  productName: string;
+  categoryId?: number;
+  categoryName?: string;
+  status: string;
+}
+
+export interface CategoryDeleteRequest {
+  // Map productId -> newCategoryId
+  productCategoryMap?: Record<number, number>;
+  hideProducts: boolean;
+}
+
+export interface CategoryDeleteResponse {
+  success: boolean;
+  message: string;
+  softDeleted: boolean;
+  categoryId: number;
+  affectedProducts?: CategoryProduct[];
+  productCount: number;
+}

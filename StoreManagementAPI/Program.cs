@@ -67,28 +67,26 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ⚠️ AUTO-MIGRATION & SEEDING ĐÃ BỊ TẮT
-// Database được setup bằng SQL script thủ công (store_management.sql)
-// Nếu cần chạy lại: Xóa database và chạy file SQL
-/*
+// ✅ AUTO-INITIALIZE DATABASE khi chạy lần đầu
+// Tự động chạy file InitialSetup.sql nếu database chưa tồn tại
 if (app.Environment.IsDevelopment())
 {
-    using (var scope = app.Services.CreateScope())
+    try
     {
-        var db = scope.ServiceProvider.GetRequiredService<StoreDbContext>();
-        try
+        var dbInitializer = new StoreManagementAPI.Services.DatabaseInitializerService(connectionString!);
+        var wasInitialized = await dbInitializer.InitializeDatabaseAsync();
+
+        if (wasInitialized)
         {
-            db.Database.Migrate(); // Tự động chạy migrations khi start
-            Console.WriteLine("✅ Database migrations applied successfully!");
-            await DbSeeder.SeedDatabase(db, app.Environment);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Migration error: {ex.Message}");
+            Console.WriteLine("🎉 Database đã được khởi tạo với đầy đủ dữ liệu mẫu!");
         }
     }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Lỗi khởi tạo database: {ex.Message}");
+        Console.WriteLine("💡 Bạn có thể chạy file SQL thủ công: store_management.sql");
+    }
 }
-*/
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())

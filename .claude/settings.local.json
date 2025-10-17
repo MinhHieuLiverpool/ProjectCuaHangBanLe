@@ -8,7 +8,13 @@
       "Bash(taskkill:*)",
       "Bash(cat:*)",
       "Bash(docker exec:*)",
-      "Bash(dotnet build)"
+      "Bash(dotnet build)",
+      "Bash(npm run build:*)",
+      "Bash(dotnet build:*)",
+      "Bash(curl:*)",
+      "Bash(awk:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(timeout 15 dotnet run:*)"
     ],
     "deny": [],
     "ask": []

@@ -114,13 +114,22 @@ export const supplierService = {
   async delete(id: number): Promise<DeleteResponse> {
     const response = await apiClient.delete<DeleteResponse>(`/suppliers/${id}`);
     return response.data;
-    },
-    async search(searchTerm: string): Promise<Supplier[]> {
+  },
+  async search(searchTerm: string): Promise<Supplier[]> {
     const response = await apiClient.get<Supplier[]>(`/suppliers/search`, {
-        params: { searchTerm },
+    params: { searchTerm },
     });
     return response.data;
-  },
+    },
+    async checkPhoneExists(phone: string): Promise<Supplier> {
+    const response = await apiClient.get<Supplier>(`/suppliers/phone/${phone}`);
+    return response.data;
+},
+
+    async checkEmailExists(email: string): Promise<Supplier> {
+    const response = await apiClient.get<Supplier>(`/suppliers/email/${email}`);
+    return response.data;
+},
 
 };
 

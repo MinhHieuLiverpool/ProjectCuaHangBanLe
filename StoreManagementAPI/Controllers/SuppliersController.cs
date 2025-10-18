@@ -304,5 +304,27 @@ namespace StoreManagementAPI.Controllers
             var suppliers = await _supplierService.SearchSupplier(searchTerm);
             return Ok(suppliers);
         }
+
+        [HttpGet("status/{status}")]
+        public async Task<ActionResult<IEnumerable<Supplier>>> GetSupplierByStatus(string status)
+        {
+            var suppliers = await _supplierService.GetSupplierByStatus(status);
+            return Ok(suppliers);
+        }
+
+        [HttpGet("phone/{phone}")]
+        public async Task<ActionResult<bool>> CheckPhoneExists(string phone)
+        {
+            bool exists = await _supplierService.CheckPhoneExists(phone);
+            return Ok(exists);
+        }
+
+        [HttpGet("email/{email}")]
+        public async Task<ActionResult<bool>> CheckEmailExists(string email)
+        {
+            bool exists = await _supplierService.CheckEmailExists(email);
+            return Ok(exists);
+        }
+
     }
 }

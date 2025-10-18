@@ -9,6 +9,7 @@ import {
     message,
     Popconfirm,
     Tag,
+    Select,
 } from "antd";
 import {
     PlusOutlined,
@@ -26,6 +27,7 @@ const SuppliersPage: React.FC = () => {
     const [modalVisible, setModalVisible] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
     const [searchValue, setSearchValue] = useState("");
+    const [statusFilter, setStatusFilter] = useState<string>("all");
     const [form] = Form.useForm();
     const [canDeleteMap, setCanDeleteMap] = useState<Record<number, boolean>>({});
 
@@ -33,15 +35,14 @@ const SuppliersPage: React.FC = () => {
         fetchData();
     }, []);
 
-    // 🔍 Lắng nghe thay đổi của ô tìm kiếm (debounce 500ms)
     useEffect(() => {
         const delayDebounce = setTimeout(() => {
-            fetchData(searchValue);
+            fetchData(searchValue, statusFilter);
         }, 500);
         return () => clearTimeout(delayDebounce);
-    }, [searchValue]);
+    }, [searchValue, statusFilter]);
 
-    const fetchData = async (searchTerm?: string) => {
+    const fetchData = async (searchTerm?: string, status?: string) => {
         setLoading(true);
         try {
             let data;
@@ -50,9 +51,17 @@ const SuppliersPage: React.FC = () => {
             } else {
                 data = await supplierService.getAll();
             }
+
+            // Lọc theo trạng thái nếu không chọn "all"
+            if (status && status !== "all") {
+                data = data.filter(
+                    (item: Supplier) => item.status.toLowerCase() === status
+                );
+            }
+
             setSuppliers(data);
 
-            // Kiểm tra xem supplier có thể xóa cứng không
+            // Kiểm tra khả năng xóa
             const canDeleteChecks: Record<number, boolean> = {};
             for (const supplier of data) {
                 if (supplier.status === "active") {
@@ -90,7 +99,7 @@ const SuppliersPage: React.FC = () => {
         try {
             await supplierService.restore(supplierId);
             message.success("Khôi phục nhà cung cấp thành công!");
-            fetchData(searchValue);
+            fetchData(searchValue, statusFilter);
         } catch (error: any) {
             message.error(error.response?.data?.message || "Khôi phục thất bại!");
         }
@@ -100,7 +109,7 @@ const SuppliersPage: React.FC = () => {
         try {
             const response = await supplierService.hide(supplierId);
             message.success(response.message || "Đã ẩn nhà cung cấp!");
-            fetchData(searchValue);
+            fetchData(searchValue, statusFilter);
         } catch (error: any) {
             message.error(error.response?.data?.message || "Ẩn thất bại!");
         }
@@ -110,7 +119,7 @@ const SuppliersPage: React.FC = () => {
         try {
             const response = await supplierService.delete(supplierId);
             message.success(response.message || "Xóa thành công!");
-            fetchData(searchValue);
+            fetchData(searchValue, statusFilter);
         } catch (error: any) {
             message.error(error.response?.data?.message || "Xóa thất bại!");
         }
@@ -127,7 +136,7 @@ const SuppliersPage: React.FC = () => {
                 message.success("Thêm mới thành công!");
             }
             setModalVisible(false);
-            fetchData(searchValue);
+            fetchData(searchValue, statusFilter);
         } catch {
             message.error("Lưu thất bại!");
         }
@@ -219,6 +228,16 @@ const SuppliersPage: React.FC = () => {
                         value={searchValue}
                         onChange={(e) => setSearchValue(e.target.value)}
                     />
+                    <Select
+                        value={statusFilter}
+                        style={{ width: 150 }}
+                        onChange={(value) => setStatusFilter(value)}
+                        options={[
+                            { value: "all", label: "Tất cả" },
+                            { value: "active", label: "Hoạt động" },
+                            { value: "inactive", label: "Đã ẩn" },
+                        ]}
+                    />
                     <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
                         Thêm nhà cung cấp
                     </Button>
@@ -232,8 +251,7 @@ const SuppliersPage: React.FC = () => {
                 loading={loading}
                 pagination={{
                     defaultPageSize: 10,
-                    showSizeChanger: true,
-                    pageSizeOptions: ["10", "50", "100"],
+                    showSizeChanger: false,
                     showTotal: (total) => `Tổng ${total} mục`,
                 }}
             />
@@ -249,24 +267,65 @@ const SuppliersPage: React.FC = () => {
                     <Form.Item
                         name="name"
                         label="Tên nhà cung cấp"
-                        rules={[{ required: true, message: "Vui lòng nhập tên!" }]}
+                        rules={[
+                            { required: true, message: "Vui lòng nhập tên!" },
+                        ]}
                     >
                         <Input />
                     </Form.Item>
 
-                    <Form.Item name="phone" label="Số điện thoại">
+                    <Form.Item
+                        name="phone"
+                        label="Số điện thoại"
+                        rules={[
+                            { required: true, message: "Vui lòng nhập số điện thoại!" },
+                            {
+                                pattern: /^0\d{9}$/, message: "Số điện thoại gồm 10 chữ số và bắt đầu bằng số 0!" },
+                            {
+                                validator: async (_, value) => {
+                                    if (!value) return Promise.resolve();
+                                    const exists = await supplierService.checkPhoneExists(value);
+                                    if (exists) {
+                                        return Promise.reject(new Error("Số điện thoại đã được sử dụng!"));
+                                    }
+                                    return Promise.resolve();
+                                }
+                            }
+                        ]}
+                    >
                         <Input />
                     </Form.Item>
 
-                    <Form.Item name="email" label="Email">
+                    <Form.Item
+                        name="email"
+                        label="Email"
+                        rules={[
+                            { required: true, message: "Vui lòng nhập email!" },
+                            { type: "email", message: "Định dạng email không hợp lệ!" },
+                            {
+                                validator: async (_, value) => {
+                                    if (!value) return Promise.resolve();
+                                    const exists = await supplierService.checkEmailExists(value);
+                                    if (exists) {
+                                        return Promise.reject(new Error("Email đã được sử dụng!"));
+                                    }
+                                    return Promise.resolve();
+                                }
+                            }
+                        ]}
+                    >
                         <Input type="email" />
                     </Form.Item>
 
-                    <Form.Item name="address" label="Địa chỉ">
+                    <Form.Item
+                        name="address"
+                        label="Địa chỉ"
+                    >
                         <Input.TextArea rows={3} />
                     </Form.Item>
                 </Form>
             </Modal>
+
         </div>
     );
 };

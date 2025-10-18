@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using StoreManagementAPI.Data;
 using StoreManagementAPI.Models;
 using StoreManagementAPI.Repositories;
+using StoreManagementAPI.Services;
 using System.Text.Json;
 
 namespace StoreManagementAPI.Controllers
@@ -15,11 +16,13 @@ namespace StoreManagementAPI.Controllers
     {
         private readonly IRepository<Supplier> _supplierRepository;
         private readonly StoreDbContext _context;
+        private readonly ISupplierService _supplierService;
 
-        public SuppliersController(IRepository<Supplier> supplierRepository, StoreDbContext context)
+        public SuppliersController(IRepository<Supplier> supplierRepository, StoreDbContext context, ISupplierService supplierService)
         {
             _supplierRepository = supplierRepository;
             _context = context;
+            _supplierService = supplierService;
         }
 
         private void LogAudit(string action, string entity, int? entityId, string? entityName, string changesSummary, object? oldValues, object? newValues)
@@ -293,6 +296,13 @@ namespace StoreManagementAPI.Controllers
                     supplierId = id
                 });
             }
+        }
+
+        [HttpGet("search")]
+        public async Task<ActionResult<IEnumerable<Supplier>>> SearchSupplier([FromQuery] string searchTerm)
+        {
+            var suppliers = await _supplierService.SearchSupplier(searchTerm);
+            return Ok(suppliers);
         }
     }
 }

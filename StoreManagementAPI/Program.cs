@@ -38,6 +38,7 @@ builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IStatisticsService, StatisticsService>();
+builder.Services.AddScoped<ISupplierService, SupplierService>();
 
 // Add HttpContextAccessor for getting HTTP context in services
 builder.Services.AddHttpContextAccessor();

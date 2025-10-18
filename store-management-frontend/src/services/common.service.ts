@@ -114,7 +114,14 @@ export const supplierService = {
   async delete(id: number): Promise<DeleteResponse> {
     const response = await apiClient.delete<DeleteResponse>(`/suppliers/${id}`);
     return response.data;
+    },
+    async search(searchTerm: string): Promise<Supplier[]> {
+    const response = await apiClient.get<Supplier[]>(`/suppliers/search`, {
+        params: { searchTerm },
+    });
+    return response.data;
   },
+
 };
 
 export const promotionService = {

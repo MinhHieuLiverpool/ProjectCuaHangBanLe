@@ -1,15 +1,25 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Space, message, Popconfirm, Tooltip } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Table, Button, Space, message, Popconfirm, Tooltip, Tag } from "antd";
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+} from "@ant-design/icons";
 import { Promotion } from "@/types";
 import { promotionService } from "@/services/common.service";
 import PromotionModal from "@/components/PromotionModal";
+import PromotionDetailModal from "@/components/PromotionDetailModal";
 
 const PromotionsPage: React.FC = () => {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(
+    null
+  );
+  const [viewingPromotion, setViewingPromotion] = useState<Promotion | null>(
     null
   );
 
@@ -55,6 +65,16 @@ const PromotionsPage: React.FC = () => {
 
   const handleModalSuccess = () => {
     fetchData();
+  };
+
+  const handleViewDetail = (promotion: Promotion) => {
+    setViewingPromotion(promotion);
+    setDetailModalVisible(true);
+  };
+
+  const handleDetailModalClose = () => {
+    setDetailModalVisible(false);
+    setViewingPromotion(null);
   };
 
   // Hàm lấy thông tin hiển thị trạng thái từ database
@@ -113,6 +133,25 @@ const PromotionsPage: React.FC = () => {
       render: (text: string) => (
         <span style={{ fontSize: "13px" }}>{text}</span>
       ),
+    },
+    {
+      title: "Sản phẩm",
+      key: "products",
+      width: 100,
+      align: "center" as const,
+      render: (_: any, record: any) => {
+        const productCount = record.products?.length || 0;
+        return (
+          <span
+            style={{
+              fontSize: "13px",
+              color: productCount > 0 ? "#1890ff" : "#999",
+            }}
+          >
+            {productCount > 0 ? `${productCount} SP` : "Tất cả"}
+          </span>
+        );
+      },
     },
     {
       title: "Loại giảm",
@@ -241,6 +280,14 @@ const PromotionsPage: React.FC = () => {
         <Space>
           <Button
             type="link"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewDetail(record)}
+            style={{ fontSize: "13px" }}
+          >
+            Chi tiết
+          </Button>
+          <Button
+            type="link"
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
             style={{ fontSize: "13px" }}
@@ -272,9 +319,10 @@ const PromotionsPage: React.FC = () => {
           marginBottom: 16,
           display: "flex",
           justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
-        <h2>Quản lý khuyến mãi</h2>
+        <h2 style={{ margin: 0 }}>Quản lý khuyến mãi</h2>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           Thêm khuyến mãi
         </Button>
@@ -285,7 +333,13 @@ const PromotionsPage: React.FC = () => {
         dataSource={promotions}
         rowKey="promoId"
         loading={loading}
-        pagination={{ pageSize: 10 }}
+        pagination={{
+          defaultPageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ["10", "50", "100"],
+          showTotal: (total) => `Tổng ${total} mục`,
+        }}
+        size="small"
       />
 
       <PromotionModal
@@ -293,6 +347,13 @@ const PromotionsPage: React.FC = () => {
         editingPromotion={editingPromotion}
         onClose={handleModalClose}
         onSuccess={handleModalSuccess}
+        hideProductSelection={false}
+      />
+
+      <PromotionDetailModal
+        visible={detailModalVisible}
+        promotion={viewingPromotion}
+        onClose={handleDetailModalClose}
       />
     </div>
   );

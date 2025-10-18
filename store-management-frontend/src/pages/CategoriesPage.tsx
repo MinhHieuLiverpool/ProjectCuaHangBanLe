@@ -7,12 +7,12 @@ import {
   Form,
   Input,
   message,
-  Popconfirm,
   Tag,
 } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import { Category } from "@/types";
+import { PlusOutlined, EditOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
+import { Category, CategoryProduct, CategoryDeleteRequest } from "@/types";
 import { categoryService } from "@/services/common.service";
+import CategoryDeleteModal from "@/components/CategoryDeleteModal";
 
 const CategoriesPage: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -20,6 +20,11 @@ const CategoriesPage: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [form] = Form.useForm();
+
+  // States for delete modal
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [categoryProducts, setCategoryProducts] = useState<CategoryProduct[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -61,23 +66,68 @@ const CategoriesPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (categoryId: number) => {
+  const handleHideClick = async (category: Category) => {
     try {
-      const response = await categoryService.delete(categoryId);
+      // Kiểm tra xem category có sản phẩm không
+      const checkResult = await categoryService.checkHide(category.categoryId);
 
-      // Kiểm tra xem có phải soft delete không
-      if (response.softDeleted) {
-        message.warning(
-          response.message ||
-            "Danh mục có sản phẩm liên quan nên đã được ẩn thay vì xóa"
-        );
+      if (checkResult.productCount === 0) {
+        // Không có sản phẩm -> ẩn trực tiếp
+        Modal.confirm({
+          title: "Ẩn danh mục?",
+          content: `Bạn có chắc chắn muốn ẩn danh mục "${category.categoryName}"?`,
+          okText: "Ẩn",
+          cancelText: "Hủy",
+          okType: "danger",
+          onOk: async () => {
+            try {
+              const response = await categoryService.hide(category.categoryId, {
+                hideProducts: false,
+              });
+              message.success(response.message || "Đã ẩn danh mục thành công!");
+              fetchData();
+            } catch (error: any) {
+              message.error(
+                error.response?.data?.message || "Ẩn danh mục thất bại!"
+              );
+            }
+          },
+        });
       } else {
-        message.success(response.message || "Xóa danh mục thành công!");
+        // Có sản phẩm -> mở modal reassign
+        setDeletingCategory(category);
+        setCategoryProducts(checkResult.affectedProducts || []);
+        setDeleteModalVisible(true);
+      }
+    } catch (error: any) {
+      message.error(
+        error.response?.data?.message || "Không thể kiểm tra danh mục!"
+      );
+    }
+  };
+
+  const handleConfirmHide = async (request: CategoryDeleteRequest) => {
+    if (!deletingCategory) return;
+
+    try {
+      const response = await categoryService.hide(
+        deletingCategory.categoryId,
+        request
+      );
+
+      if (response.success) {
+        message.success(response.message);
+      } else {
+        message.warning(response.message);
       }
 
+      setDeleteModalVisible(false);
+      setDeletingCategory(null);
+      setCategoryProducts([]);
       fetchData();
     } catch (error: any) {
-      message.error(error.response?.data?.message || "Xóa danh mục thất bại!");
+      message.error(error.response?.data?.message || "Ẩn danh mục thất bại!");
+      throw error; // Re-throw để modal có thể handle loading state
     }
   };
 
@@ -140,18 +190,17 @@ const CategoriesPage: React.FC = () => {
               style={{ color: "green" }}
               onClick={() => handleRestore(record.categoryId)}
             >
-              Hiện lại
+              Khôi phục
             </Button>
           ) : (
-            <Popconfirm
-              title="Xóa danh mục?"
-              description="Nếu có sản phẩm liên quan, danh mục sẽ được ẩn thay vì xóa."
-              onConfirm={() => handleDelete(record.categoryId)}
+            <Button
+              type="link"
+              danger
+              icon={<EyeInvisibleOutlined />}
+              onClick={() => handleHideClick(record)}
             >
-              <Button type="link" danger icon={<DeleteOutlined />}>
-                Xóa
-              </Button>
-            </Popconfirm>
+              Ẩn
+            </Button>
           )}
         </Space>
       ),
@@ -178,7 +227,12 @@ const CategoriesPage: React.FC = () => {
         dataSource={categories}
         rowKey="categoryId"
         loading={loading}
-        pagination={{ pageSize: 10 }}
+        pagination={{
+          defaultPageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ["10", "50", "100"],
+          showTotal: (total) => `Tổng ${total} mục`,
+        }}
       />
 
       <Modal
@@ -197,6 +251,19 @@ const CategoriesPage: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <CategoryDeleteModal
+        visible={deleteModalVisible}
+        category={deletingCategory}
+        products={categoryProducts}
+        allCategories={categories}
+        onConfirm={handleConfirmHide}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setDeletingCategory(null);
+          setCategoryProducts([]);
+        }}
+      />
     </div>
   );
 };

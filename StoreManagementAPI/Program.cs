@@ -7,6 +7,9 @@ using StoreManagementAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load appsettings.Local.json (ignored by git) for local development
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
 // Add services to the container
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -34,6 +37,7 @@ builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IStatisticsService, StatisticsService>();
 
 // Add HttpContextAccessor for getting HTTP context in services
 builder.Services.AddHttpContextAccessor();
@@ -63,21 +67,24 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Auto-apply pending migrations in Development (Best Practice)
+// ✅ AUTO-INITIALIZE DATABASE khi chạy lần đầu
+// Tự động chạy file InitialSetup.sql nếu database chưa tồn tại
 if (app.Environment.IsDevelopment())
 {
-    using (var scope = app.Services.CreateScope())
+    try
     {
-        var db = scope.ServiceProvider.GetRequiredService<StoreDbContext>();
-        try
+        var dbInitializer = new StoreManagementAPI.Services.DatabaseInitializerService(connectionString!);
+        var wasInitialized = await dbInitializer.InitializeDatabaseAsync();
+
+        if (wasInitialized)
         {
-            db.Database.Migrate(); // Tự động chạy migrations khi start
-            Console.WriteLine("✅ Database migrations applied successfully!");
+            Console.WriteLine("🎉 Database đã được khởi tạo với đầy đủ dữ liệu mẫu!");
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Migration error: {ex.Message}");
-        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Lỗi khởi tạo database: {ex.Message}");
+        Console.WriteLine("💡 Bạn có thể chạy file SQL thủ công: store_management.sql");
     }
 }
 

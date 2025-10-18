@@ -16,6 +16,7 @@ namespace StoreManagementAPI.Data
         public DbSet<Product> Products { get; set; }
         public DbSet<Inventory> Inventories { get; set; }
         public DbSet<Promotion> Promotions { get; set; }
+        public DbSet<PromotionProduct> PromotionProducts { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<Payment> Payments { get; set; }
@@ -100,6 +101,24 @@ namespace StoreManagementAPI.Data
 
             modelBuilder.Entity<Promotion>()
                 .HasIndex(p => p.PromoCode)
+                .IsUnique();
+
+            // PromotionProduct many-to-many relationship
+            modelBuilder.Entity<PromotionProduct>()
+                .HasOne(pp => pp.Promotion)
+                .WithMany(p => p.PromotionProducts)
+                .HasForeignKey(pp => pp.PromoId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PromotionProduct>()
+                .HasOne(pp => pp.Product)
+                .WithMany(p => p.PromotionProducts)
+                .HasForeignKey(pp => pp.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Unique constraint: một sản phẩm chỉ có thể thuộc một khuyến mãi 1 lần
+            modelBuilder.Entity<PromotionProduct>()
+                .HasIndex(pp => new { pp.PromoId, pp.ProductId })
                 .IsUnique();
 
             // Purchase Orders relationships

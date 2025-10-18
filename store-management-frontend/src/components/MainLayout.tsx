@@ -38,13 +38,18 @@ const MainLayout: React.FC = () => {
       label: "Dashboard",
     },
     {
+      key: "/statistics",
+      icon: <BarChartOutlined />,
+      label: "Thống kê & Báo cáo",
+    },
+    {
       key: "/products",
       icon: <ShoppingOutlined />,
       label: "Sản phẩm",
     },
     {
       key: "/inventory",
-      icon: <BarChartOutlined />,
+      icon: <InboxOutlined />,
       label: "Quản lí tồn kho",
     },
     {

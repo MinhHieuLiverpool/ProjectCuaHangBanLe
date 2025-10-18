@@ -1,5 +1,13 @@
 import apiClient from "./api";
-import { Customer, Category, Supplier, Promotion } from "@/types";
+import {
+  Customer,
+  Category,
+  Supplier,
+  Promotion,
+  CategoryProduct,
+  CategoryDeleteRequest,
+  CategoryDeleteResponse
+} from "@/types";
 
 interface DeleteResponse {
   message: string;
@@ -52,6 +60,18 @@ export const categoryService = {
     const response = await apiClient.get<Category[]>("/categories");
     return response.data.filter((c) => c.status === "active");
   },
+  async getProducts(id: number): Promise<CategoryProduct[]> {
+    const response = await apiClient.get<CategoryProduct[]>(
+      `/categories/${id}/products`
+    );
+    return response.data;
+  },
+  async checkHide(id: number): Promise<CategoryDeleteResponse> {
+    const response = await apiClient.get<CategoryDeleteResponse>(
+      `/categories/${id}/check-hide`
+    );
+    return response.data;
+  },
   async create(data: Omit<Category, "categoryId">): Promise<Category> {
     const response = await apiClient.post<Category>("/categories", data);
     return response.data;
@@ -63,9 +83,13 @@ export const categoryService = {
   async restore(id: number): Promise<void> {
     await apiClient.patch(`/categories/${id}/restore`);
   },
-  async delete(id: number): Promise<DeleteResponse> {
-    const response = await apiClient.delete<DeleteResponse>(
-      `/categories/${id}`
+  async hide(
+    id: number,
+    request?: CategoryDeleteRequest
+  ): Promise<CategoryDeleteResponse> {
+    const response = await apiClient.patch<CategoryDeleteResponse>(
+      `/categories/${id}/hide`,
+      request
     );
     return response.data;
   },
@@ -80,6 +104,15 @@ export const supplierService = {
     const response = await apiClient.get<Supplier[]>("/suppliers");
     return response.data.filter((s) => s.status === "active");
   },
+  async canDelete(id: number): Promise<{
+    canHardDelete: boolean;
+    hasProducts: boolean;
+    hasPurchaseOrders: boolean;
+    message: string;
+  }> {
+    const response = await apiClient.get(`/suppliers/${id}/can-delete`);
+    return response.data;
+  },
   async create(data: Omit<Supplier, "supplierId">): Promise<Supplier> {
     const response = await apiClient.post<Supplier>("/suppliers", data);
     return response.data;
@@ -90,6 +123,10 @@ export const supplierService = {
   },
   async restore(id: number): Promise<void> {
     await apiClient.patch(`/suppliers/${id}/restore`);
+  },
+  async hide(id: number): Promise<{ message: string }> {
+    const response = await apiClient.patch(`/suppliers/${id}/hide`);
+    return response.data;
   },
   async delete(id: number): Promise<DeleteResponse> {
     const response = await apiClient.delete<DeleteResponse>(`/suppliers/${id}`);

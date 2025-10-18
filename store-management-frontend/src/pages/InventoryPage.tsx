@@ -357,8 +357,9 @@ const InventoryPage: React.FC = () => {
         rowKey="inventoryId"
         loading={loading}
         pagination={{
-          pageSize: 10,
+          defaultPageSize: 10,
           showSizeChanger: true,
+          pageSizeOptions: ["10", "50", "100"],
           showTotal: (total) => `Tổng ${total} mục`,
         }}
         scroll={{ x: 1200 }}

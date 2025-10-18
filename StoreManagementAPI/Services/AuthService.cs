@@ -16,18 +16,21 @@ namespace StoreManagementAPI.Services
         Task<IEnumerable<User>> GetUsersAsync();
         Task<bool> UpdateUserAsync(int id, UpdateUserDto updateDto);
         Task<bool> DeleteUserAsync(int id);
-        Task<bool> UpdatePasswordAsync(int userId, string newPassword);
+        Task<bool> UpdatePasswordAsync(int userId, string OldPassword, string newPassword);
+        Task<bool> ToggleUserStatusAsync(int userId);
     }
 
     public class AuthService : IAuthService
     {
         private readonly IRepository<User> _userRepository;
         private readonly IConfiguration _configuration;
+        private readonly IAuditLogService _auditLogService;
 
-        public AuthService(IRepository<User> userRepository, IConfiguration configuration)
+        public AuthService(IRepository<User> userRepository, IConfiguration configuration, IAuditLogService auditLogService)
         {
             _userRepository = userRepository;
             _configuration = configuration;
+            _auditLogService = auditLogService;
         }
 
         public async Task<LoginResponseDto?> LoginAsync(LoginDto loginDto)
@@ -37,10 +40,51 @@ namespace StoreManagementAPI.Services
 
             if (user == null || user.Password != loginDto.Password)
             {
+                // Log failed login attempt
+                await _auditLogService.LogActionAsync(
+                    action: "LOGIN_FAILED",
+                    entityType: "User",
+                    entityId: null,
+                    entityName: loginDto.Username,
+                    oldValues: null,
+                    newValues: null,
+                    changesSummary: $"Đăng nhập thất bại cho tài khoản '{loginDto.Username}'",
+                    userId: null,
+                    username: loginDto.Username,
+                    additionalInfo: new Dictionary<string, object>
+                    {
+                        { "Reason", user == null ? "Tài khoản không tồn tại" : "Sai mật khẩu" },
+                        { "AttemptTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }
+                    }
+                );
                 return null;
             }
 
+            // Kiểm tra tài khoản có bị khóa không
+            if (user.Status != "active")
+            {
+                throw new Exception("Account is locked. Please contact administrator.");
+            }
+
             var token = GenerateJwtToken(user);
+
+            // Log successful login
+            await _auditLogService.LogActionAsync(
+                action: "LOGIN",
+                entityType: "User",
+                entityId: user.UserId,
+                entityName: user.FullName ?? user.Username,
+                oldValues: null,
+                newValues: null,
+                changesSummary: $"Người dùng '{user.Username}' ({user.FullName}) đăng nhập thành công",
+                userId: user.UserId,
+                username: user.Username,
+                additionalInfo: new Dictionary<string, object>
+                {
+                    { "Role", user.Role },
+                    { "LoginTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }
+                }
+            );
 
             return new LoginResponseDto
             {
@@ -53,9 +97,38 @@ namespace StoreManagementAPI.Services
 
         public async Task<User?> RegisterAsync(RegisterDto registerDto)
         {
+            // Nếu user muốn tạo admin, kiểm tra có admin chưa
+            if (registerDto.Role == "admin")
+            {
+                var hasAdmin = await _userRepository.ExistsAsync(u => u.Role == "admin");
+                if (hasAdmin)
+                    throw new Exception("Only one admin account is allowed.");
+            }
+
+            // Nếu không chỉ định role, mặc định là staff
+            if (string.IsNullOrEmpty(registerDto.Role))
+                registerDto.Role = "staff";
+            
             var exists = await _userRepository.ExistsAsync(u => u.Username == registerDto.Username);
             if (exists)
             {
+                // Log failed registration attempt
+                await _auditLogService.LogActionAsync(
+                    action: "REGISTER_FAILED",
+                    entityType: "User",
+                    entityId: null,
+                    entityName: registerDto.Username,
+                    oldValues: null,
+                    newValues: null,
+                    changesSummary: $"Đăng ký thất bại: Tài khoản '{registerDto.Username}' đã tồn tại",
+                    userId: null,
+                    username: "system",
+                    additionalInfo: new Dictionary<string, object>
+                    {
+                        { "Reason", "Username already exists" },
+                        { "AttemptTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }
+                    }
+                );
                 return null;
             }
 
@@ -67,7 +140,31 @@ namespace StoreManagementAPI.Services
                 Role = registerDto.Role
             };
 
-            return await _userRepository.AddAsync(user);
+            var newUser = await _userRepository.AddAsync(user);
+
+            // Log successful registration
+            await _auditLogService.LogActionAsync(
+                action: "REGISTER",
+                entityType: "User",
+                entityId: newUser.UserId,
+                entityName: newUser.FullName ?? newUser.Username,
+                oldValues: null,
+                newValues: new
+                {
+                    Username = newUser.Username,
+                    FullName = newUser.FullName,
+                    Role = newUser.Role
+                },
+                changesSummary: $"Đăng ký tài khoản mới: '{newUser.Username}' ({newUser.FullName}) với vai trò {newUser.Role}",
+                userId: newUser.UserId,
+                username: newUser.Username,
+                additionalInfo: new Dictionary<string, object>
+                {
+                    { "RegisterTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }
+                }
+            );
+
+            return newUser;
         }
 
         public string GenerateJwtToken(User user)
@@ -104,14 +201,12 @@ namespace StoreManagementAPI.Services
             var user = users.FirstOrDefault();
             if (user == null) return false;
 
+          
             if (!string.IsNullOrEmpty(updateDto.Password))
                 user.Password = updateDto.Password; 
 
             if (!string.IsNullOrEmpty(updateDto.FullName))
                 user.FullName = updateDto.FullName;
-
-            if (!string.IsNullOrEmpty(updateDto.Role))
-                user.Role = updateDto.Role;
 
             await _userRepository.UpdateAsync(user);
             return true;
@@ -122,7 +217,24 @@ namespace StoreManagementAPI.Services
             return await _userRepository.DeleteAsync(id);
         }
 
-        public async Task<bool> UpdatePasswordAsync(int userId, string newPassword)
+        public async Task<bool> UpdatePasswordAsync(int userId, string oldPassword, string newPassword)
+        {
+            var users = await _userRepository.FindAsync(u => u.UserId == userId);
+            var user = users.FirstOrDefault();
+
+            if (user == null)
+                return false;
+                
+             // Kiểm tra mật khẩu cũ
+            if (user.Password != oldPassword)
+                throw new Exception("Old password is incorrect.");
+
+            user.Password = newPassword; 
+            await _userRepository.UpdateAsync(user);
+            return true;
+        }
+
+        public async Task<bool> ToggleUserStatusAsync(int userId)
         {
             var users = await _userRepository.FindAsync(u => u.UserId == userId);
             var user = users.FirstOrDefault();
@@ -130,7 +242,14 @@ namespace StoreManagementAPI.Services
             if (user == null)
                 return false;
 
-            user.Password = newPassword; 
+            // Không cho phép khóa admin ID = 1
+            if (user.UserId == 1 && user.Role == "admin")
+            {
+                throw new Exception("Cannot lock the primary admin account (ID = 1)");
+            }
+
+            // Toggle status giữa active và inactive
+            user.Status = user.Status == "active" ? "inactive" : "active";
             await _userRepository.UpdateAsync(user);
             return true;
         }

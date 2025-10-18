@@ -19,7 +19,10 @@ import {
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
   Line,
   LineChart,
@@ -164,6 +167,93 @@ const ProductDetailPage: React.FC = () => {
   const systemStock = product.stockQuantity || 0;
   const diff = Math.abs(calculatedStock - systemStock);
 
+  // Tính tổng giá trị nhập/bán
+  const totalPurchaseValue = productHistory
+    .filter((h) => h.type === "purchase")
+    .reduce((sum, h) => sum + h.totalAmount, 0);
+  const totalSaleValue = productHistory
+    .filter((h) => h.type === "sale")
+    .reduce((sum, h) => sum + h.totalAmount, 0);
+
+  // Tính giá gần nhất
+  const latestPurchasePrice = productHistory
+    .filter((h) => h.type === "purchase")
+    .sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    )[0]?.unitPrice;
+
+  const latestSalePrice = productHistory
+    .filter((h) => h.type === "sale")
+    .sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    )[0]?.unitPrice;
+
+  // Dữ liệu cho biểu đồ giá trị theo tháng
+  const monthlyValueData = (() => {
+    const monthlyData: {
+      [key: string]: {
+        month: string;
+        giaTriNhap: number;
+        giaTriBan: number;
+      };
+    } = {};
+
+    productHistory.forEach((item) => {
+      const date = new Date(item.date);
+      const monthKey = `${date.getFullYear()}-${String(
+        date.getMonth() + 1
+      ).padStart(2, "0")}`;
+
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = {
+          month: monthKey,
+          giaTriNhap: 0,
+          giaTriBan: 0,
+        };
+      }
+
+      if (item.type === "purchase") {
+        monthlyData[monthKey].giaTriNhap += item.totalAmount;
+      } else {
+        monthlyData[monthKey].giaTriBan += item.totalAmount;
+      }
+    });
+
+    return Object.values(monthlyData).sort((a, b) =>
+      a.month.localeCompare(b.month)
+    );
+  })();
+
+  // Dữ liệu cho biểu đồ chênh lệch giá theo từng đợt giao dịch
+  const priceMarginData = (() => {
+    // Sắp xếp theo thời gian
+    const sortedHistory = [...productHistory].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    return sortedHistory.map((item, index) => {
+      const date = new Date(item.date);
+      const displayTime = `${date.getDate()}/${
+        date.getMonth() + 1
+      } ${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`;
+
+      // Tính chênh lệch so với giá bán hiện tại
+      const margin = product.price - item.unitPrice;
+      const marginPercent =
+        item.unitPrice > 0 ? ((margin / item.unitPrice) * 100).toFixed(1) : "0";
+
+      return {
+        time: displayTime,
+        donGia: item.unitPrice,
+        giaBan: product.price,
+        chenhLech: margin,
+        chenhLechPercent: parseFloat(marginPercent),
+        loai: item.type === "purchase" ? "Nhập" : "Bán",
+        index: index + 1,
+      };
+    });
+  })();
+
   return (
     <div>
       <div
@@ -240,15 +330,37 @@ const ProductDetailPage: React.FC = () => {
             </strong>
           </Descriptions.Item>
 
-          <Descriptions.Item label="Giá nhập" span={1}>
-            <span style={{ fontSize: "15px", color: "#d32f2f" }}>
-              {(product.costPrice || 0).toLocaleString("vi-VN")}đ
-            </span>
+          <Descriptions.Item label="Giá nhập gần nhất" span={1}>
+            <div>
+              <span style={{ fontSize: "15px", color: "#d32f2f" }}>
+                {(latestPurchasePrice || product.costPrice || 0).toLocaleString(
+                  "vi-VN"
+                )}
+                đ
+              </span>
+              {latestPurchasePrice &&
+                latestPurchasePrice !== product.costPrice && (
+                  <div style={{ fontSize: "12px", color: "#666" }}>
+                    Hiện tại: {(product.costPrice || 0).toLocaleString("vi-VN")}
+                    đ
+                  </div>
+                )}
+            </div>
           </Descriptions.Item>
-          <Descriptions.Item label="Giá bán" span={1}>
-            <span style={{ fontSize: "15px", color: "#1976d2" }}>
-              {product.price.toLocaleString("vi-VN")}đ
-            </span>
+          <Descriptions.Item label="Giá bán gần nhất" span={1}>
+            <div>
+              <span style={{ fontSize: "15px", color: "#1976d2" }}>
+                {(latestSalePrice || product.price || 0).toLocaleString(
+                  "vi-VN"
+                )}
+                đ
+              </span>
+              {latestSalePrice && latestSalePrice !== product.price && (
+                <div style={{ fontSize: "12px", color: "#666" }}>
+                  Hiện tại: {product.price.toLocaleString("vi-VN")}đ
+                </div>
+              )}
+            </div>
           </Descriptions.Item>
         </Descriptions>
 
@@ -277,77 +389,67 @@ const ProductDetailPage: React.FC = () => {
           <Col xs={24} sm={12} md={6}>
             <Card size="small">
               <Statistic
-                title="Tồn tính toán"
-                value={calculatedStock}
-                suffix={product.unit}
-                valueStyle={{ color: "#fa8c16", fontSize: "20px" }}
+                title="Tổng giá trị nhập"
+                value={totalPurchaseValue}
+                suffix="đ"
+                valueStyle={{ color: "#ff7875", fontSize: "18px" }}
+                formatter={(value) => `${value.toLocaleString("vi-VN")}`}
               />
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "#666",
-                  marginTop: "4px",
-                }}
-              >
-                = Nhập - Bán
-              </div>
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card size="small">
               <Statistic
-                title="Tồn hệ thống"
-                value={systemStock}
-                suffix={product.unit}
-                valueStyle={{
-                  color: systemStock < 10 ? "#ff4d4f" : "#52c41a",
-                  fontSize: "20px",
-                }}
+                title="Tổng giá trị bán"
+                value={totalSaleValue}
+                suffix="đ"
+                valueStyle={{ color: "#52c41a", fontSize: "18px" }}
+                formatter={(value) => `${value.toLocaleString("vi-VN")}`}
               />
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "#666",
-                  marginTop: "4px",
-                }}
-              >
-                Từ database
-              </div>
             </Card>
           </Col>
         </Row>
 
-        {/* Cảnh báo nếu số liệu không khớp */}
-        {diff > 0 && (
-          <div
-            style={{
-              padding: "12px",
-              background: "#fff7e6",
-              border: "1px solid #ffd591",
-              borderRadius: "4px",
-              marginBottom: "16px",
-            }}
-          >
-            <p style={{ margin: 0, color: "#d46b08", fontSize: "13px" }}>
-              ⚠️ <strong>Cảnh báo:</strong> Tồn kho tính toán ({calculatedStock}{" "}
-              {product.unit}) không khớp với tồn kho hệ thống ({systemStock}{" "}
-              {product.unit}). Chênh lệch:{" "}
-              <strong>
-                {diff} {product.unit}
-              </strong>
-              <br />
-              <span style={{ fontSize: "12px" }}>
-                💡 Có thể do: tồn kho đầu kỳ, điều chỉnh kho, hoặc giao dịch
-                chưa được ghi nhận trong lịch sử.
-              </span>
-            </p>
-          </div>
-        )}
-
-        {/* Biểu đồ xu hướng */}
+        {/* Biểu đồ giá trị tiền nhập/xuất theo tháng */}
         {productHistory.length > 0 && (
           <Card
-            title="📊 Biểu đồ xu hướng nhập/xuất theo tháng"
+            title="💰 Biểu đồ giá trị tiền nhập/xuất theo tháng"
+            size="small"
+            style={{ marginBottom: "20px" }}
+          >
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart
+                data={monthlyValueData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip
+                  formatter={(value: number) => `${value.toLocaleString()}đ`}
+                />
+                <Legend />
+                <Bar
+                  dataKey="giaTriNhap"
+                  fill="#ff7875"
+                  name="Giá trị nhập (đ)"
+                />
+                <Bar
+                  dataKey="giaTriBan"
+                  fill="#52c41a"
+                  name="Giá trị bán (đ)"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        )}
+
+        {/* Biểu đồ xu hướng số lượng nhập/xuất theo tháng */}
+        {productHistory.length > 0 && (
+          <Card
+            title="📊 Biểu đồ số lượng nhập/xuất theo tháng"
             size="small"
             style={{ marginBottom: "20px" }}
           >
@@ -413,6 +515,136 @@ const ProductDetailPage: React.FC = () => {
           </Card>
         )}
 
+        {/* Biểu đồ chênh lệch giá theo từng đợt giao dịch */}
+        {productHistory.length > 0 && (
+          <Card
+            title="📈 Biểu đồ giá nhập/bán & chênh lệch theo từng đợt giao dịch"
+            size="small"
+            style={{ marginBottom: "20px" }}
+          >
+            <ResponsiveContainer width="100%" height={350}>
+              <ComposedChart
+                data={priceMarginData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="time"
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis
+                  yAxisId="left"
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                  label={{
+                    value: "Giá (đ)",
+                    angle: -90,
+                    position: "insideLeft",
+                  }}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  label={{
+                    value: "Chênh lệch (%)",
+                    angle: 90,
+                    position: "insideRight",
+                  }}
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div
+                          style={{
+                            background: "#fff",
+                            padding: "10px",
+                            border: "1px solid #ccc",
+                            borderRadius: "4px",
+                          }}
+                        >
+                          <p style={{ margin: 0, fontWeight: "bold" }}>
+                            {data.loai} - {data.time}
+                          </p>
+                          <p style={{ margin: "4px 0", color: "#ff7875" }}>
+                            Đơn giá: {data.donGia.toLocaleString()}đ
+                          </p>
+                          <p style={{ margin: "4px 0", color: "#1890ff" }}>
+                            Giá bán: {data.giaBan.toLocaleString()}đ
+                          </p>
+                          <p style={{ margin: "4px 0", color: "#52c41a" }}>
+                            Chênh lệch: {data.chenhLech.toLocaleString()}đ (
+                            {data.chenhLechPercent}%)
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Legend />
+                <Bar
+                  yAxisId="left"
+                  dataKey="donGia"
+                  fill="#ff7875"
+                  name="Đơn giá giao dịch"
+                />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="giaBan"
+                  stroke="#1890ff"
+                  strokeWidth={2}
+                  name="Giá bán hiện tại"
+                  strokeDasharray="5 5"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="chenhLechPercent"
+                  stroke="#52c41a"
+                  strokeWidth={2}
+                  name="% Chênh lệch"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <div
+              style={{
+                marginTop: "12px",
+                padding: "8px",
+                background: "#f0f5ff",
+                borderRadius: "4px",
+                fontSize: "12px",
+              }}
+            >
+              <p style={{ margin: 0 }}>
+                💡 <strong>Ghi chú:</strong>
+              </p>
+              <ul style={{ margin: "4px 0", paddingLeft: "20px" }}>
+                <li>
+                  Biểu đồ hiển thị giá nhập/bán của <strong>từng đợt</strong>{" "}
+                  giao dịch theo thời gian
+                </li>
+                <li>
+                  <strong>Đơn giá giao dịch</strong> (cột đỏ): Giá thực tế khi
+                  nhập/bán tại thời điểm đó
+                </li>
+                <li>
+                  <strong>Giá bán hiện tại</strong> (đường xanh dương nét đứt):
+                  Giá bán hiện tại của sản phẩm
+                </li>
+                <li>
+                  <strong>% Chênh lệch</strong> (đường xanh lá): Tỷ lệ chênh
+                  lệch giữa giá bán hiện tại và đơn giá giao dịch
+                </li>
+              </ul>
+            </div>
+          </Card>
+        )}
+
         {/* Bảng lịch sử */}
         <Card
           title={
@@ -442,7 +674,12 @@ const ProductDetailPage: React.FC = () => {
             dataSource={filteredHistory}
             loading={historyLoading}
             rowKey={(record) => `${record.type}-${record.id}-${record.date}`}
-            pagination={{ pageSize: 10, showSizeChanger: true }}
+            pagination={{
+              defaultPageSize: 10,
+              showSizeChanger: true,
+              pageSizeOptions: ["10", "50", "100"],
+              showTotal: (total) => `Tổng ${total} mục`,
+            }}
             size="small"
             scroll={{ x: 1000 }}
             columns={[

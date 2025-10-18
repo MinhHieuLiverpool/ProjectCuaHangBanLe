@@ -20,6 +20,7 @@ import StockReceiptsPage from "./pages/StockReceiptsPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import UsersPage from "./pages/UsersPage";
 import AuditLogsPage from "./pages/AuditLogsPage";
+import StatisticsPage from "./pages/StatisticsPage";
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="statistics" element={<StatisticsPage />} />
             <Route path="products" element={<ProductsPage />} />
             <Route path="products/:id" element={<ProductDetailPage />} />
             <Route path="inventory" element={<InventoryPage />} />

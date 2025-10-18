@@ -281,7 +281,7 @@ const handleToggleStatus = async (customerId: number, newStatus: "active" | "ina
               Hiện
             </Button>
           )}
-          <Popconfirm
+          {/* <Popconfirm
             title={
               <div>
                 <div>Bạn có chắc muốn xóa?</div>
@@ -299,8 +299,8 @@ const handleToggleStatus = async (customerId: number, newStatus: "active" | "ina
               icon={<DeleteOutlined />}
             >
               Xóa
-            </Button>
-          </Popconfirm>
+            </Button> */}
+          {/* </Popconfirm> */}
         </Space>
       ),
     },
@@ -343,7 +343,12 @@ const handleToggleStatus = async (customerId: number, newStatus: "active" | "ina
         dataSource={filteredCustomer}
         rowKey="customerId"
         loading={loading}
-        pagination={{ pageSize: 10 }}
+        pagination={{
+          defaultPageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ["10", "50", "100"],
+          showTotal: (total) => `Tổng ${total} mục`,
+        }}
       />
 
       <Modal

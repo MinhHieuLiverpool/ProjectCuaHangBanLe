@@ -7,10 +7,9 @@ import {
   Form,
   Input,
   message,
-  Popconfirm,
-  Select,
+  Tag,
 } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined, LockOutlined } from "@ant-design/icons";
+import { PlusOutlined, LockOutlined, UnlockOutlined } from "@ant-design/icons";
 import { userService } from "@/services/user.service";
 import { User } from "@/types";
 
@@ -22,7 +21,6 @@ const UsersPage: React.FC = () => {
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [passwordForm] = Form.useForm();
-  const [editingId, setEditingId] = useState<number | null>(null);
   const [changingPasswordId, setChangingPasswordId] = useState<number | null>(null);
 
 
@@ -45,67 +43,56 @@ const UsersPage: React.FC = () => {
 
   const handleCreate = () => {
     form.resetFields();
-    setEditingId(null);
     setModalVisible(true);
-
   };
 
-  const handleEdit = (record: User) => {
-    form.setFieldsValue({
-      username: record.username,
-      fullName: record.fullName,
-      role: record.role,
-    });
-    setEditingId(record.userId)
-    setModalVisible(true);
-
-  };
   const handleChangePassword = (record: User) => {
     passwordForm.resetFields();
     setChangingPasswordId(record.userId);
     setPasswordModalVisible(true);
   };
 
-
-  const handleDelete = async (userId: number) => {
-    try {
-      await userService.deleteUser(userId);
-      message.success("Xóa tài khoản thành công");
-      fetchUsers();
-    } catch (error: any) {
-      message.error(error.response?.data?.message || "Có lỗi xảy ra khi xóa tài khoản");
-    }
-  };
-
   const handleModalOk = async () => {
     try {
       const values = await form.validateFields();
-      if (editingId) {
-        await userService.updateUser(editingId, values);
-        message.success("Cập nhật tài khoản thành công");
-      } else {
-        await userService.createUser(values);
-        message.success("Thêm tài khoản thành công");
-      }
+      // Mặc định tạo tài khoản với role là "staff" (nhân viên)
+      const userData = {
+        ...values,
+        role: "staff"
+      };
+      await userService.createUser(userData);
+      message.success("Thêm tài khoản nhân viên thành công");
       setModalVisible(false);
+      form.resetFields();
       fetchUsers();
     } catch (error: any) {
-      message.error(error.response?.data?.message || "Có lỗi xảy ra khi lưu tài khoản");
+      message.error(error.response?.data?.message || "Có lỗi xảy ra khi thêm tài khoản");
     }
   };
   const handlePasswordModalOk = async () => {
     try {
       const values = await passwordForm.validateFields();
       if (changingPasswordId == null) {
-      message.error("Không xác định được người dùng cần đổi mật khẩu!");
-      return;
-    }
-      await userService.updatePassword(changingPasswordId, values.newPassword);
+        message.error("Không xác định được người dùng cần đổi mật khẩu!");
+        return;
+      }
+      await userService.updatePassword(changingPasswordId, values.oldPassword, values.newPassword);
       message.success('Đổi mật khẩu thành công');
       setPasswordModalVisible(false);
       passwordForm.resetFields();
-    } catch (error) {
-      message.error('Không thể đổi mật khẩu');
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Không thể đổi mật khẩu');
+    }
+  };
+
+  const handleToggleStatus = async (userId: number, currentStatus: string) => {
+    try {
+      await userService.toggleUserStatus(userId);
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      message.success(`${newStatus === 'active' ? 'Mở khóa' : 'Khóa'} tài khoản thành công`);
+      fetchUsers();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Không thể thay đổi trạng thái tài khoản');
     }
   };
 
@@ -116,6 +103,7 @@ const UsersPage: React.FC = () => {
       title: "ID",
       dataIndex: "userId",
       key: "userId",
+      width: 80,
     },
     {
       title: "Tên đăng nhập",
@@ -134,34 +122,37 @@ const UsersPage: React.FC = () => {
       render: (role: string) => (role === "admin" ? "Quản trị viên" : "Nhân viên"),
     },
     {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      render: (status: string) => (
+        <Tag color={status === "active" ? "green" : "red"}>
+          {status === "active" ? "Hoạt động" : "Đã khóa"}
+        </Tag>
+      ),
+    },
+    {
       title: "Thao tác",
       key: "action",
       render: (_: any, record: User) => (
         <Space>
           <Button
-           type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            Sửa
-          </Button>
-          <Button
-           type="link"
+            type="link"
             icon={<LockOutlined />}
             onClick={() => handleChangePassword(record)}
           >
             Đổi MK
           </Button>
-          <Popconfirm
-            title="Bạn có chắc chắn muốn xóa?"
-            onConfirm={() => handleDelete(record.userId)}
-            okText="Có"
-            cancelText="Không"
-          >
-            <Button  type="link" icon={<DeleteOutlined />} danger>
-              Xóa
+          {record.userId !== 1 && (
+            <Button
+              type="link"
+              icon={record.status === "active" ? <LockOutlined /> : <UnlockOutlined />}
+              onClick={() => handleToggleStatus(record.userId, record.status)}
+              style={{ color: record.status === "active" ? "orange" : "green" }}
+            >
+              {record.status === "active" ? "Khóa" : "Mở khóa"}
             </Button>
-          </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -186,10 +177,16 @@ const UsersPage: React.FC = () => {
         dataSource={users}
         rowKey="userId"
         loading={loading}
+        pagination={{
+          defaultPageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ["10", "50", "100"],
+          showTotal: (total) => `Tổng ${total} mục`,
+        }}
       />
 
       <Modal
-        title={editingId ? "Sửa tài khoản" : "Thêm tài khoản"}
+        title="Thêm tài khoản nhân viên mới"
         open={modalVisible}
         onOk={handleModalOk}
         onCancel={() => setModalVisible(false)}
@@ -200,18 +197,16 @@ const UsersPage: React.FC = () => {
             label="Tên đăng nhập"
             rules={[{ required: true, message: "Vui lòng nhập tên đăng nhập" }]}
           >
-            <Input disabled={!!editingId} />
+            <Input />
           </Form.Item>
 
-          {!editingId && (
-            <Form.Item
-              name="password"
-              label="Mật khẩu"
-              rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
-            >
-              <Input.Password />
-            </Form.Item>
-          )}
+          <Form.Item
+            name="password"
+            label="Mật khẩu"
+            rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
+          >
+            <Input.Password />
+          </Form.Item>
 
           <Form.Item
             name="fullName"
@@ -219,17 +214,6 @@ const UsersPage: React.FC = () => {
             rules={[{ required: true, message: "Vui lòng nhập tên đầy đủ" }]}
           >
             <Input />
-          </Form.Item>
-
-          <Form.Item
-            name="role"
-            label="Vai trò"
-            rules={[{ required: true, message: "Vui lòng chọn vai trò" }]}
-          >
-            <Select>
-              <Select.Option value="admin">Quản trị viên</Select.Option>
-              <Select.Option value="staff">Nhân viên</Select.Option>
-            </Select>
           </Form.Item>
         </Form>
       </Modal>
@@ -244,6 +228,15 @@ const UsersPage: React.FC = () => {
           form={passwordForm}
           layout="vertical"
         >
+          <Form.Item
+            name="oldPassword"
+            label="Mật khẩu cũ"
+            rules={[
+              { required: true, message: 'Vui lòng nhập mật khẩu cũ' }
+            ]}
+          >
+            <Input.Password placeholder="Nhập mật khẩu cũ để xác nhận" />
+          </Form.Item>
           <Form.Item
             name="newPassword"
             label="Mật khẩu mới"

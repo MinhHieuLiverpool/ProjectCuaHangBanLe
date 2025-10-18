@@ -2,10 +2,7 @@ import { DeleteOutlined, EyeOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   Button,
   Card,
-  Form,
-  InputNumber,
   Modal,
-  Select,
   Space,
   Table,
   Tag,
@@ -15,6 +12,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import React, { useEffect, useState } from "react";
 import api from "../services/api";
+import CreatePurchaseOrderModal from "../components/PurchaseOrders/CreatePurchaseOrderModal";
 
 interface Supplier {
   supplierId: number;
@@ -51,18 +49,15 @@ interface PurchaseOrder {
 }
 
 const StockReceiptsPage: React.FC = () => {
-  const [form] = Form.useForm();
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(
     null
   );
-  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
 
   // Kho mặc định
   const DEFAULT_WAREHOUSE_ID = 1;
@@ -97,97 +92,12 @@ const StockReceiptsPage: React.FC = () => {
     fetchPurchaseOrders();
   }, []);
 
-  const addPurchaseItem = () => {
-    setPurchaseItems([
-      ...purchaseItems,
-      { productId: 0, quantity: 1, costPrice: 0, currentStock: 0 },
-    ]);
-  };
-
-  const removePurchaseItem = (index: number) => {
-    setPurchaseItems(purchaseItems.filter((_, i) => i !== index));
-  };
-
-  const updatePurchaseItem = async (
-    index: number,
-    field: string,
-    value: any
-  ) => {
-    const newItems = [...purchaseItems];
-    newItems[index] = { ...newItems[index], [field]: value };
-
-    // If product changed, fetch its cost price and current stock
-    if (field === "productId" && value) {
-      const selectedProduct = products.find((p) => p.productId === value);
-
-      if (selectedProduct) {
-        newItems[index].costPrice = selectedProduct.costPrice || 0;
-        newItems[index].productName = selectedProduct.productName;
-
-        // Fetch current stock từ kho mặc định
-        try {
-          const response = await api.get(
-            `/inventory/warehouse/${DEFAULT_WAREHOUSE_ID}`
-          );
-
-          const inventory = response.data.find(
-            (inv: any) => inv.productId === value
-          );
-          newItems[index].currentStock = inventory ? inventory.quantity : 0;
-        } catch (error) {
-          console.error("Error fetching inventory:", error);
-          newItems[index].currentStock = 0;
-        }
-      }
-    }
-
-    setPurchaseItems(newItems);
-  };
-
   const handleCreateModalOpen = () => {
-    form.resetFields();
-    setPurchaseItems([]);
     setIsCreateModalVisible(true);
   };
 
   const handleCreateModalClose = () => {
     setIsCreateModalVisible(false);
-    form.resetFields();
-    setPurchaseItems([]);
-  };
-
-  const handleSubmit = async (values: any) => {
-    if (purchaseItems.length === 0) {
-      message.error("Vui lòng thêm ít nhất một sản phẩm");
-      return;
-    }
-
-    const hasInvalid = purchaseItems.some(
-      (item) => !item.productId || item.quantity <= 0
-    );
-
-    if (hasInvalid) {
-      message.error("Vui lòng chọn sản phẩm và nhập số lượng");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await api.post("/purchaseorders", {
-        supplierId: values.supplierId,
-        warehouseId: DEFAULT_WAREHOUSE_ID, // Sử dụng kho mặc định
-        items: purchaseItems,
-      });
-      message.success("Tạo phiếu nhập hàng thành công");
-      handleCreateModalClose();
-      fetchPurchaseOrders();
-    } catch (error: any) {
-      message.error(
-        error.response?.data?.message || "Không thể tạo phiếu nhập hàng"
-      );
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   const updateStatus = async (purchaseId: number, status: string) => {
@@ -338,154 +248,26 @@ const StockReceiptsPage: React.FC = () => {
           dataSource={purchaseOrders}
           rowKey="purchaseId"
           loading={loading}
-          pagination={{ pageSize: 10 }}
+          pagination={{
+            defaultPageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ["10", "50", "100"],
+            showTotal: (total) => `Tổng ${total} mục`,
+          }}
           onRow={(record) => ({
             onDoubleClick: () => viewDetails(record.purchaseId),
           })}
         />
       </Card>
 
-      <Modal
-        title="Tạo phiếu nhập hàng"
-        open={isCreateModalVisible}
-        onCancel={handleCreateModalClose}
-        footer={null}
-        width={900}
-      >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item
-            label="Nhà cung cấp"
-            name="supplierId"
-            rules={[{ required: true, message: "Vui lòng chọn nhà cung cấp" }]}
-          >
-            <Select
-              placeholder="Chọn nhà cung cấp"
-              showSearch
-              optionFilterProp="children"
-            >
-              {suppliers.map((s) => (
-                <Select.Option key={s.supplierId} value={s.supplierId}>
-                  {s.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <div style={{ marginBottom: 16 }}>
-            <h4>Danh sách sản phẩm</h4>
-            {purchaseItems.map((item, index) => (
-              <div
-                key={index}
-                style={{
-                  marginBottom: 16,
-                  padding: 12,
-                  border: "1px solid #d9d9d9",
-                  borderRadius: 4,
-                  backgroundColor: "#fafafa",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    marginBottom: 8,
-                    alignItems: "center",
-                  }}
-                >
-                  <Select
-                    style={{ flex: 2 }}
-                    placeholder="Chọn sản phẩm"
-                    showSearch
-                    optionFilterProp="children"
-                    value={item.productId || undefined}
-                    onChange={(value) =>
-                      updatePurchaseItem(index, "productId", value)
-                    }
-                  >
-                    {products.map((p) => (
-                      <Select.Option key={p.productId} value={p.productId}>
-                        {p.productName} - {p.barcode}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                  <Button
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => removePurchaseItem(index)}
-                  />
-                </div>
-                <div
-                  style={{ display: "flex", gap: 8, alignItems: "flex-start" }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{ fontSize: 12, color: "#666", marginBottom: 4 }}
-                    >
-                      Giá nhập (không sửa được)
-                    </div>
-                    <InputNumber
-                      style={{ width: "100%" }}
-                      placeholder="Giá nhập"
-                      min={0}
-                      disabled
-                      formatter={(value) =>
-                        `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "đ"
-                      }
-                      value={item.costPrice}
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{ fontSize: 12, color: "#666", marginBottom: 4 }}
-                    >
-                      Số lượng tồn kho hiện tại
-                    </div>
-                    <InputNumber
-                      style={{ width: "100%" }}
-                      placeholder="Tồn kho"
-                      disabled
-                      value={item.currentStock || 0}
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{ fontSize: 12, color: "#666", marginBottom: 4 }}
-                    >
-                      <span style={{ color: "red" }}>* </span>Số lượng nhập
-                    </div>
-                    <InputNumber
-                      style={{ width: "100%" }}
-                      placeholder="Nhập số lượng"
-                      min={1}
-                      value={item.quantity}
-                      onChange={(value) =>
-                        updatePurchaseItem(index, "quantity", value || 1)
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={addPurchaseItem}
-              block
-            >
-              Thêm sản phẩm
-            </Button>
-          </div>
-
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit" loading={submitting}>
-                Tạo phiếu nhập
-              </Button>
-              <Button onClick={handleCreateModalClose}>Hủy</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+      <CreatePurchaseOrderModal
+        visible={isCreateModalVisible}
+        suppliers={suppliers}
+        products={products}
+        warehouseId={DEFAULT_WAREHOUSE_ID}
+        onClose={handleCreateModalClose}
+        onSuccess={fetchPurchaseOrders}
+      />
 
       <Modal
         title={`Chi tiết phiếu nhập #${selectedOrder?.purchaseId}`}

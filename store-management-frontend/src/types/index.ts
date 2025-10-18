@@ -3,6 +3,7 @@ export interface User {
   username: string;
   fullName: string;
   role: "admin" | "staff";
+  status: "active" | "inactive";
 }
 
 export interface LoginRequest {
@@ -31,6 +32,7 @@ export interface Product {
   unit: string;
   status: string; // active || inactive
   stockQuantity?: number;
+  hasOrders?: boolean; // True nếu sản phẩm đã được bán
 }
 
 export interface CreateProductDto {
@@ -39,8 +41,8 @@ export interface CreateProductDto {
   productName: string;
   barcode?: string;
   price: number;
-  costPrice: number;
   unit: string;
+  // costPrice được cập nhật khi nhập hàng
 }
 
 export interface ProductHistory {
@@ -101,6 +103,8 @@ export interface Promotion {
   usageLimit: number;
   usedCount: number;
   status: "active" | "inactive";
+  applyType?: "order" | "product" | "combo";
+  products?: Array<{ productId: number; productName: string; price?: number }>;
 }
 
 export interface OrderItem {
@@ -121,6 +125,8 @@ export interface OrderItemResponse {
   quantity: number;
   price: number;
   subtotal: number;
+  discountAmount: number;
+  discountPercent: number;
 }
 
 export interface OrderResponse {
@@ -136,6 +142,10 @@ export interface OrderResponse {
   finalAmount: number;
   paymentMethod?: string;
   paymentDate?: string;
+  promoId?: number;
+  promoCode?: string;
+  promoType?: string;
+  promoDescription?: string;
   items: OrderItemResponse[];
 }
 
@@ -143,4 +153,27 @@ export interface PaymentDto {
   orderId: number;
   amount: number;
   paymentMethod: "cash" | "card" | "bank_transfer" | "e-wallet";
+}
+
+export interface CategoryProduct {
+  productId: number;
+  productName: string;
+  categoryId?: number;
+  categoryName?: string;
+  status: string;
+}
+
+export interface CategoryDeleteRequest {
+  // Map productId -> newCategoryId
+  productCategoryMap?: Record<number, number>;
+  hideProducts: boolean;
+}
+
+export interface CategoryDeleteResponse {
+  success: boolean;
+  message: string;
+  softDeleted: boolean;
+  categoryId: number;
+  affectedProducts?: CategoryProduct[];
+  productCount: number;
 }

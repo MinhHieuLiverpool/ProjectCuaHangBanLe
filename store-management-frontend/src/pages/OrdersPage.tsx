@@ -24,6 +24,7 @@ import {
   SearchOutlined,
   FilterOutlined,
   ReloadOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import { OrderResponse, Customer, Product, Promotion } from "@/types";
 import { orderService } from "@/services/order.service";
@@ -31,6 +32,7 @@ import { customerService, promotionService } from "@/services/common.service";
 import { productService } from "@/services/product.service";
 import { useAuth } from "@/context/AuthContext";
 import CreateOrderModal from "@/components/Orders/CreateOrderModal";
+import html2canvas from "html2canvas";
 
 const OrdersPage: React.FC = () => {
   const { user } = useAuth();
@@ -90,6 +92,7 @@ const OrdersPage: React.FC = () => {
   const handleViewDetail = async (order: OrderResponse) => {
     try {
       const detail = await orderService.getById(order.orderId);
+      console.log("Order detail response:", detail);
       setSelectedOrder(detail);
       setDetailModalVisible(true);
     } catch (error) {
@@ -114,6 +117,386 @@ const OrdersPage: React.FC = () => {
       setCustomers(customersData);
     } catch (error) {
       message.error("Thêm khách hàng thất bại!");
+    }
+  };
+
+  const handleExportPDF = async (order: OrderResponse) => {
+    try {
+      // Create a new window for printing
+      const printWindow = window.open("", "_blank", "width=800,height=600");
+
+      if (!printWindow) {
+        message.error(
+          "Không thể mở cửa sổ in. Vui lòng cho phép popup trong trình duyệt."
+        );
+        return;
+      }
+
+      // Get promotion details if available
+      let promotionDetails = null;
+      if (order.promoId) {
+        try {
+          const promotion = promotions.find((p) => p.promoId === order.promoId);
+          if (promotion) {
+            promotionDetails = promotion;
+          }
+        } catch (error) {
+          console.warn("Không thể tải thông tin khuyến mãi:", error);
+        }
+      }
+
+      // Generate HTML content for printing
+      const printContent = `
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Hóa đơn ${order.orderId}</title>
+          <style>
+            body {
+              font-family: 'Arial', sans-serif;
+              margin: 0;
+              padding: 20px;
+              color: #333;
+              line-height: 1.6;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #333;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 28px;
+              color: #2c3e50;
+            }
+            .header h2 {
+              margin: 10px 0 0 0;
+              font-size: 20px;
+              color: #34495e;
+            }
+            .order-info {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 20px;
+              margin-bottom: 30px;
+            }
+            .info-section h3 {
+              margin: 0 0 10px 0;
+              color: #2c3e50;
+              font-size: 16px;
+              border-bottom: 1px solid #bdc3c7;
+              padding-bottom: 5px;
+            }
+            .info-item {
+              margin-bottom: 8px;
+            }
+            .info-label {
+              font-weight: bold;
+              display: inline-block;
+              width: 120px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 20px 0;
+            }
+            th, td {
+              border: 1px solid #bdc3c7;
+              padding: 12px;
+              text-align: left;
+            }
+            th {
+              background-color: #3498db;
+              color: white;
+              font-weight: bold;
+            }
+            tr:nth-child(even) {
+              background-color: #f8f9fa;
+            }
+            .totals {
+              margin-top: 30px;
+              text-align: right;
+            }
+            .total-row {
+              display: flex;
+              justify-content: flex-end;
+              margin-bottom: 10px;
+            }
+            .total-label {
+              font-weight: bold;
+              width: 150px;
+              text-align: right;
+              margin-right: 20px;
+            }
+            .total-amount {
+              font-size: 16px;
+              font-weight: bold;
+            }
+            .final-total {
+              font-size: 18px;
+              color: #e74c3c;
+              border-top: 2px solid #333;
+              padding-top: 10px;
+            }
+            .promotion-section {
+              margin: 20px 0;
+              padding: 15px;
+              background-color: #ecf0f1;
+              border-radius: 5px;
+            }
+            .promotion-section h3 {
+              margin: 0 0 10px 0;
+              color: #27ae60;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 40px;
+              padding-top: 20px;
+              border-top: 1px solid #bdc3c7;
+              color: #7f8c8d;
+            }
+            .status-badge {
+              display: inline-block;
+              padding: 4px 8px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: bold;
+            }
+            .status-paid {
+              background-color: #27ae60;
+              color: white;
+            }
+            .status-pending {
+              background-color: #f39c12;
+              color: white;
+            }
+            .status-cancelled {
+              background-color: #e74c3c;
+              color: white;
+            }
+            @media print {
+              body { margin: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>CỬA HÀNG BÁN LẺ</h1>
+            <h2>HÓA ĐƠN BÁN HÀNG</h2>
+          </div>
+
+          <div class="order-info">
+            <div class="info-section">
+              <h3>Thông tin đơn hàng</h3>
+              <div class="info-item">
+                <span class="info-label">Mã đơn hàng:</span>
+                ${order.orderId}
+              </div>
+              <div class="info-item">
+                <span class="info-label">Ngày đặt:</span>
+                ${new Date(order.orderDate).toLocaleDateString("vi-VN")}
+              </div>
+              <div class="info-item">
+                <span class="info-label">Trạng thái:</span>
+                <span class="status-badge status-${order.status}">
+                  ${
+                    order.status === "paid"
+                      ? "Đã thanh toán"
+                      : order.status === "pending"
+                      ? "Chờ thanh toán"
+                      : "Đã hủy"
+                  }
+                </span>
+              </div>
+            </div>
+
+            <div class="info-section">
+              <h3>Thông tin khách hàng</h3>
+              ${
+                order.customerName
+                  ? `<div class="info-item"><span class="info-label">Khách hàng:</span>${order.customerName}</div>`
+                  : ""
+              }
+              ${
+                order.userName
+                  ? `<div class="info-item"><span class="info-label">Nhân viên:</span>${order.userName}</div>`
+                  : ""
+              }
+              ${
+                order.paymentMethod
+                  ? `<div class="info-item"><span class="info-label">Thanh toán:</span>${
+                      order.paymentMethod === "cash"
+                        ? "Tiền mặt"
+                        : order.paymentMethod === "card"
+                        ? "Thẻ"
+                        : order.paymentMethod === "bank_transfer"
+                        ? "Chuyển khoản"
+                        : order.paymentMethod === "e-wallet"
+                        ? "Ví điện tử"
+                        : order.paymentMethod
+                    }</div>`
+                  : ""
+              }
+              ${
+                order.paymentDate
+                  ? `<div class="info-item"><span class="info-label">Ngày thanh toán:</span>${new Date(
+                      order.paymentDate
+                    ).toLocaleDateString("vi-VN")}</div>`
+                  : ""
+              }
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Tên sản phẩm</th>
+                <th>Số lượng</th>
+                <th>Đơn giá</th>
+                <th>Thành tiền</th>
+                <th>Giảm giá</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${order.items
+                .map((item) => {
+                  const originalTotal = item.price * item.quantity;
+                  const hasDiscount = item.discountAmount && item.discountAmount > 0;
+                  return `
+                <tr>
+                  <td>${item.productName}</td>
+                  <td>${item.quantity}</td>
+                  <td>${new Intl.NumberFormat("vi-VN", {
+                    style: "currency",
+                    currency: "VND",
+                  }).format(item.price)}</td>
+                  <td>
+                    ${
+                      hasDiscount
+                        ? `<span style="text-decoration: line-through; color: #999;">${new Intl.NumberFormat(
+                            "vi-VN",
+                            {
+                              style: "currency",
+                              currency: "VND",
+                            }
+                          ).format(originalTotal)}</span><br/>`
+                        : ""
+                    }
+                    <strong>${new Intl.NumberFormat("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
+                    }).format(item.subtotal)}</strong>
+                  </td>
+                  <td style="color: ${hasDiscount ? '#e74c3c' : '#999'}; font-weight: ${hasDiscount ? 'bold' : 'normal'};">
+                    ${
+                      hasDiscount
+                        ? `<div style="color: #e74c3c; font-weight: bold;">-${new Intl.NumberFormat("vi-VN", {
+                            style: "currency",
+                            currency: "VND",
+                          }).format(item.discountAmount)}</div>
+                      <small style="color: #52c41a;">(${item.discountPercent.toFixed(
+                        1
+                      )}%)</small>`
+                        : `<span style="color: #999;">0đ</span>`
+                    }
+                  </td>
+                </tr>
+              `;
+                })
+                .join("")}
+            </tbody>
+          </table>
+
+          ${
+            order.discountAmount > 0
+              ? `
+            <div class="promotion-section">
+              <h3>Thông tin khuyến mãi</h3>
+              ${
+                promotionDetails
+                  ? `
+                <div class="info-item"><span class="info-label">Tên chương trình:</span><strong>${
+                  promotionDetails.description || "N/A"
+                }</strong></div>
+                <div class="info-item"><span class="info-label">Mã khuyến mãi:</span>${
+                  promotionDetails.promoCode
+                }</div>
+                <div class="info-item"><span class="info-label">Loại:</span>${
+                  promotionDetails.applyType === "order"
+                    ? "Giảm theo hóa đơn"
+                    : promotionDetails.applyType === "product"
+                    ? "Giảm theo sản phẩm"
+                    : promotionDetails.applyType === "combo"
+                    ? "Giảm combo"
+                    : promotionDetails.applyType
+                }</div>
+              `
+                  : ""
+              }
+              <div class="info-item"><span class="info-label">Giảm giá:</span><strong>${new Intl.NumberFormat(
+                "vi-VN",
+                { style: "currency", currency: "VND" }
+              ).format(order.discountAmount)}</strong></div>
+            </div>
+          `
+              : ""
+          }
+
+          <div class="totals">
+            <div class="total-row">
+              <span class="total-label">Tổng tiền:</span>
+              <span class="total-amount">${new Intl.NumberFormat("vi-VN", {
+                style: "currency",
+                currency: "VND",
+              }).format(order.totalAmount)}</span>
+            </div>
+            ${
+              order.discountAmount > 0
+                ? `
+              <div class="total-row">
+                <span class="total-label">Giảm giá:</span>
+                <span class="total-amount">-${new Intl.NumberFormat("vi-VN", {
+                  style: "currency",
+                  currency: "VND",
+                }).format(order.discountAmount)}</span>
+              </div>
+            `
+                : ""
+            }
+            <div class="total-row final-total">
+              <span class="total-label">Thành tiền:</span>
+              <span class="total-amount">${new Intl.NumberFormat("vi-VN", {
+                style: "currency",
+                currency: "VND",
+              }).format(order.finalAmount)}</span>
+            </div>
+          </div>
+
+          <div class="footer">
+            <p>Cảm ơn quý khách đã mua hàng!</p>
+            <p>Hẹn gặp lại quý khách lần sau!</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Write content to the print window
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+
+      // Wait for content to load then print
+      printWindow.onload = () => {
+        printWindow.print();
+        message.success(
+          'Đã mở cửa sổ in. Vui lòng chọn "Lưu thành PDF" trong hộp thoại in.'
+        );
+      };
+    } catch (error) {
+      console.error("Lỗi xuất PDF:", error);
+      message.error("Có lỗi xảy ra khi xuất PDF!");
     }
   };
 
@@ -509,7 +892,9 @@ const OrdersPage: React.FC = () => {
         rowKey="orderId"
         loading={loading}
         pagination={{
-          pageSize: 10,
+          defaultPageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ["10", "50", "100"],
           showTotal: (total) => `Tổng ${total} đơn hàng`,
         }}
       />
@@ -557,6 +942,14 @@ const OrdersPage: React.FC = () => {
               Hủy đơn hàng
             </Button>
           ),
+          <Button
+            key="export-pdf"
+            type="default"
+            icon={<FileTextOutlined />}
+            onClick={() => selectedOrder && handleExportPDF(selectedOrder)}
+          >
+            Xuất PDF
+          </Button>,
           <Button key="close" onClick={() => setDetailModalVisible(false)}>
             Đóng
           </Button>,
@@ -588,6 +981,54 @@ const OrdersPage: React.FC = () => {
               )}
             </p>
 
+            {/* Promotion information */}
+            {selectedOrder.discountAmount > 0 &&
+              (() => {
+                // Tìm promotion từ promoId trong database
+                const appliedPromotion = selectedOrder.promoId
+                  ? promotions.find((p) => p.promoId === selectedOrder.promoId)
+                  : null;
+
+                if (appliedPromotion) {
+                  const typeText =
+                    appliedPromotion.applyType === "order"
+                      ? "Giảm theo hóa đơn"
+                      : appliedPromotion.applyType === "product"
+                      ? "Giảm theo sản phẩm"
+                      : appliedPromotion.applyType === "combo"
+                      ? "Giảm combo"
+                      : "Không xác định";
+
+                  return (
+                    <p>
+                      <strong>Mã khuyến mãi:</strong>{" "}
+                      <Tag color="blue">{appliedPromotion.promoCode}</Tag>{" "}
+                      <span style={{ color: "#666", fontSize: "12px" }}>
+                        ({typeText})
+                      </span>
+                    </p>
+                  );
+                }
+
+                // Nếu không tìm thấy promotion nhưng có discount, hiển thị promoCode nếu có
+                if (selectedOrder.promoCode) {
+                  return (
+                    <p>
+                      <strong>Mã khuyến mãi:</strong>{" "}
+                      <Tag color="blue">{selectedOrder.promoCode}</Tag>
+                    </p>
+                  );
+                }
+
+                // Fallback cuối cùng
+                return (
+                  <p>
+                    <strong>Mã khuyến mãi:</strong>{" "}
+                    <Tag color="orange">Đã áp dụng</Tag>
+                  </p>
+                );
+              })()}
+
             {/* Payment information */}
             {selectedOrder.paymentMethod && (
               <>
@@ -612,7 +1053,20 @@ const OrdersPage: React.FC = () => {
 
             <Divider />
             <Table
-              dataSource={selectedOrder.items}
+              dataSource={selectedOrder.items?.map((item: any) => {
+                // Nếu item không có discountAmount, tính toán lại từ order discount
+                if ((!item.discountAmount || item.discountAmount === 0) && selectedOrder.discountAmount > 0) {
+                  const originalTotal = item.price * item.quantity;
+                  const calculatedDiscount = originalTotal - item.subtotal;
+                  const calculatedPercent = calculatedDiscount > 0 ? (calculatedDiscount / originalTotal) * 100 : 0;
+                  return {
+                    ...item,
+                    discountAmount: calculatedDiscount,
+                    discountPercent: calculatedPercent
+                  };
+                }
+                return item;
+              })}
               columns={[
                 {
                   title: "Sản phẩm",
@@ -631,8 +1085,30 @@ const OrdersPage: React.FC = () => {
                   title: "Thành tiền",
                   dataIndex: "subtotal",
                   key: "subtotal",
-                  render: (price: number) =>
-                    `${(price || 0).toLocaleString("vi-VN")}đ`,
+                  render: (subtotal: number, record: any) => {
+                    const originalTotal = record.price * record.quantity;
+                    return (
+                      <div>
+                        <div
+                          style={{
+                            textDecoration:
+                              record.discountAmount > 0
+                                ? "line-through"
+                                : "none",
+                            color:
+                              record.discountAmount > 0 ? "#999" : "inherit",
+                          }}
+                        >
+                          {originalTotal.toLocaleString("vi-VN")}đ
+                        </div>
+                        {record.discountAmount > 0 && (
+                          <div style={{ color: "#e74c3c", fontWeight: "bold" }}>
+                            {subtotal.toLocaleString("vi-VN")}đ
+                          </div>
+                        )}
+                      </div>
+                    );
+                  },
                 },
               ]}
               rowKey="productId"
@@ -645,10 +1121,50 @@ const OrdersPage: React.FC = () => {
                 Tổng tiền:{" "}
                 {(selectedOrder.totalAmount || 0).toLocaleString("vi-VN")}đ
               </p>
-              <p>
-                Giảm giá: -
-                {(selectedOrder.discountAmount || 0).toLocaleString("vi-VN")}đ
-              </p>
+              {selectedOrder.discountAmount > 0 && (() => {
+                // Lấy thông tin promotion để biết loại và sản phẩm áp dụng
+                const promotion = selectedOrder.promoId
+                  ? promotions.find((p) => p.promoId === selectedOrder.promoId)
+                  : null;
+
+                let discountText = "";
+
+                if (promotion) {
+                  if (promotion.applyType === "order") {
+                    // Giảm theo đơn hàng - không liệt kê sản phẩm
+                    const percent = ((selectedOrder.discountAmount / selectedOrder.totalAmount) * 100);
+                    discountText = `(Giảm ${percent.toFixed(0)}% cho toàn bộ đơn hàng)`;
+                  } else if (promotion.applyType === "product" || promotion.applyType === "combo") {
+                    // Giảm theo sản phẩm hoặc combo - liệt kê sản phẩm áp dụng
+                    const applicableProducts = promotion.products || [];
+
+                    // Tìm sản phẩm trong đơn hàng có trong danh sách áp dụng
+                    const discountedItems = selectedOrder.items?.filter((item: any) =>
+                      applicableProducts.some((p) => p.productId === item.productId)
+                    );
+
+                    if (discountedItems && discountedItems.length > 0) {
+                      // Tính % giảm giá trung bình
+                      const totalApplicable = discountedItems.reduce((sum: number, item: any) =>
+                        sum + (item.price * item.quantity), 0);
+                      const percent = ((selectedOrder.discountAmount / totalApplicable) * 100);
+
+                      const productNames = discountedItems.map((item: any) => item.productName).join(", ");
+                      discountText = `(Giảm ${percent.toFixed(0)}% cho ${productNames})`;
+                    }
+                  }
+                }
+
+                return (
+                  <p>
+                    Giảm giá: -
+                    {(selectedOrder.discountAmount || 0).toLocaleString("vi-VN")}đ{" "}
+                    <span style={{ color: "#52c41a", fontSize: "13px" }}>
+                      {discountText}
+                    </span>
+                  </p>
+                );
+              })()}
               <h3>
                 Thành tiền:{" "}
                 {(selectedOrder.finalAmount || 0).toLocaleString("vi-VN")}đ

@@ -20,12 +20,13 @@ import {
   UserAddOutlined,
   BarcodeOutlined,
   EditOutlined,
-  CameraOutlined,
   PlusOutlined,
   MinusOutlined,
+  EyeOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { Customer, Product, Promotion } from "@/types";
-import BarcodeScanner from "./BarcodeScanner";
+import BarcodeCameraButton from "../shared/BarcodeCameraButton";
 
 interface OrderItem {
   productId: number;
@@ -46,7 +47,7 @@ interface CreateOrderModalProps {
   onAddCustomer: () => void;
 }
 
-const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
+const CreateOrderModal = ({
   visible,
   customers,
   products,
@@ -55,12 +56,17 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onClose,
   onSuccess,
   onAddCustomer,
-}) => {
+}: CreateOrderModalProps): JSX.Element => {
   const [form] = Form.useForm();
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [inputMode, setInputMode] = useState<"manual" | "barcode">("manual");
   const [barcodeInput, setBarcodeInput] = useState("");
-  const [showScanner, setShowScanner] = useState(false);
+  const [selectedPromotionType, setSelectedPromotionType] =
+    useState<string>("");
+  const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(
+    null
+  );
+  const [promotionDetailVisible, setPromotionDetailVisible] = useState(false);
   const barcodeInputRef = useRef<any>(null);
 
   // Auto focus vào input barcode khi chuyển sang chế độ quét
@@ -214,7 +220,92 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   };
 
   const calculateTotal = () => {
+    const subtotal = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
+
+    if (selectedPromotion) {
+      const { discount } = calculatePromotionDiscount(selectedPromotion);
+      return Math.max(0, subtotal - discount);
+    }
+
+    return subtotal;
+  };
+
+  const calculateSubtotal = () => {
     return orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
+  };
+
+  const calculateDiscount = () => {
+    if (selectedPromotion) {
+      const { discount } = calculatePromotionDiscount(selectedPromotion);
+      return discount;
+    }
+    return 0;
+  };
+
+  const calculatePromotionDiscount = (promotion: Promotion) => {
+    const subtotal = calculateSubtotal();
+    let discount = 0;
+    const isEligible = subtotal >= promotion.minOrderAmount;
+    const requiredAmount = promotion.minOrderAmount - subtotal;
+
+    if (isEligible) {
+      if (promotion.applyType === "order") {
+        // Áp dụng cho toàn bộ đơn hàng
+        if (promotion.discountType === "percent") {
+          discount = subtotal * (promotion.discountValue / 100);
+        } else {
+          discount = promotion.discountValue;
+        }
+      } else if (promotion.applyType === "product") {
+        // Áp dụng cho sản phẩm cụ thể
+        if (promotion.products && promotion.products.length > 0) {
+          const applicableProductIds = promotion.products.map(
+            (p) => p.productId
+          );
+
+          orderItems.forEach((item) => {
+            if (applicableProductIds.includes(item.productId)) {
+              if (promotion.discountType === "percent") {
+                discount += item.totalPrice * (promotion.discountValue / 100);
+              } else {
+                discount += Math.min(promotion.discountValue, item.totalPrice);
+              }
+            }
+          });
+        }
+      } else if (promotion.applyType === "combo") {
+        // Áp dụng giảm giá cho combo sản phẩm
+        if (promotion.products && promotion.products.length > 0) {
+          const applicableProductIds = promotion.products.map(
+            (p) => p.productId
+          );
+
+          // Tính tổng tiền của các sản phẩm áp dụng
+          let applicableSubtotal = 0;
+          orderItems.forEach((item) => {
+            if (applicableProductIds.includes(item.productId)) {
+              applicableSubtotal += item.totalPrice;
+            }
+          });
+
+          // Áp dụng giảm giá cho tổng tiền áp dụng
+          if (promotion.discountType === "percent") {
+            discount = applicableSubtotal * (promotion.discountValue / 100);
+          } else {
+            discount = promotion.discountValue;
+          }
+
+          // Giới hạn giảm giá không vượt quá tổng tiền áp dụng
+          discount = Math.min(discount, applicableSubtotal);
+        }
+      }
+    }
+
+    return {
+      discount,
+      isEligible,
+      requiredAmount: Math.max(0, requiredAmount),
+    };
   };
 
   const handleSubmit = async () => {
@@ -229,7 +320,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       const orderData = {
         customerId: values.customerId,
         userId: userId,
-        promoCode: values.promotionCode,
+        promoCode:
+          values.promotionCode === "none" ? null : values.promotionCode,
         items: orderItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -245,6 +337,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       setOrderItems([]);
       setBarcodeInput("");
       setInputMode("manual");
+      setSelectedPromotionType("");
+      setSelectedPromotion(null);
       onSuccess();
       onClose();
     } catch (error) {
@@ -257,6 +351,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     setOrderItems([]);
     setBarcodeInput("");
     setInputMode("manual");
+    setSelectedPromotionType("");
+    setSelectedPromotion(null);
     onClose();
   };
 
@@ -414,28 +510,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               </Select>
             </Form.Item>
           </Col>
-          <Col span={10}>
-            <Form.Item name="promotionCode" label="Mã khuyến mãi">
-              <Select allowClear placeholder="Chọn mã khuyến mãi (tùy chọn)">
-                {promotions
-                  .filter((promo) => promo.status === "active")
-                  .map((promo) => (
-                    <Select.Option
-                      key={promo.promoId}
-                      value={promo.promoCode}
-                      label={`${promo.promoCode} - Giảm ${promo.discountValue}${
-                        promo.discountType === "percent" ? "%" : "đ"
-                      }`}
-                    >
-                      <span style={{ fontSize: "14px" }}>
-                        {promo.promoCode} - Giảm {promo.discountValue}
-                        {promo.discountType === "percent" ? "%" : "đ"}
-                      </span>
-                    </Select.Option>
-                  ))}
-              </Select>
-            </Form.Item>
-          </Col>
         </Row>
         <Divider style={{ margin: "12px 0", fontSize: "13px" }}>
           Thêm sản phẩm
@@ -532,15 +606,12 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             </Col>
             <Col span={4}>
               <Form.Item label=" ">
-                <Button
-                  onClick={() => setShowScanner(true)}
+                <BarcodeCameraButton
+                  onScan={handleBarcodeScan}
+                  buttonText="Camera"
+                  buttonSize="large"
                   block
-                  type="default"
-                  size="large"
-                  icon={<CameraOutlined />}
-                >
-                  Camera
-                </Button>
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -574,27 +645,349 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             }}
           >
             <div>
-              Tổng SL:{" "}
-              <strong style={{ color: "#52c41a", fontSize: "14px" }}>
-                {orderItems.reduce((sum, item) => sum + item.quantity, 0)}
-              </strong>
+              <div>
+                Tổng SL:{" "}
+                <strong style={{ color: "#52c41a", fontSize: "14px" }}>
+                  {orderItems.reduce((sum, item) => sum + item.quantity, 0)}
+                </strong>
+              </div>
+              {selectedPromotion && (
+                <div style={{ marginTop: "4px", fontSize: "12px" }}>
+                  Mã KM:{" "}
+                  <span style={{ color: "#1890ff", fontWeight: "bold" }}>
+                    {selectedPromotion.promoCode}
+                  </span>
+                </div>
+              )}
             </div>
-            <div>
-              Tổng cộng:{" "}
-              <strong style={{ color: "#1890ff", fontSize: "16px" }}>
-                {calculateTotal().toLocaleString("vi-VN")}đ
-              </strong>
+            <div style={{ textAlign: "right" }}>
+              <div>
+                Tạm tính:{" "}
+                <span style={{ color: "#666", fontSize: "14px" }}>
+                  {calculateSubtotal().toLocaleString("vi-VN")}đ
+                </span>
+              </div>
+              {calculateDiscount() > 0 && (
+                <div>
+                  Giảm giá:{" "}
+                  <span style={{ color: "#ff4d4f", fontSize: "14px" }}>
+                    -{calculateDiscount().toLocaleString("vi-VN")}đ
+                  </span>
+                </div>
+              )}
+              <div
+                style={{
+                  marginTop: "4px",
+                  borderTop: "1px solid #d9d9d9",
+                  paddingTop: "4px",
+                }}
+              >
+                <strong style={{ color: "#1890ff", fontSize: "16px" }}>
+                  Tổng cộng: {calculateTotal().toLocaleString("vi-VN")}đ
+                </strong>
+              </div>
             </div>
           </div>
         </Card>
+        <Divider style={{ margin: "12px 0", fontSize: "13px" }}>
+          Khuyến mãi
+        </Divider>
+        <Row gutter={12} style={{ marginBottom: 12 }}>
+          <Col span={8}>
+            <Form.Item name="promotionType" label="Loại KM">
+              <Select
+                allowClear
+                placeholder="Loại"
+                style={{ width: "100%" }}
+                onChange={(value) => {
+                  setSelectedPromotionType(value || "");
+                  // Reset promotion code when type changes
+                  form.setFieldsValue({ promotionCode: undefined });
+                }}
+              >
+                <Select.Option value="order">Theo bill</Select.Option>
+                <Select.Option value="product">Theo SP</Select.Option>
+                <Select.Option value="combo">Combo</Select.Option>
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col span={16}>
+            <Form.Item name="promotionCode" label="Mã khuyến mãi">
+              <Space.Compact style={{ width: "100%" }}>
+                <Select
+                  allowClear
+                  placeholder={
+                    selectedPromotionType
+                      ? "Chọn mã khuyến mãi"
+                      : "Chọn loại KM trước"
+                  }
+                  disabled={!selectedPromotionType}
+                  onChange={(value) => {
+                    if (value === "none") {
+                      setSelectedPromotion(null);
+                      form.setFieldsValue({ promotionCode: "none" });
+                    } else if (value) {
+                      const promo = promotions.find(
+                        (p) => p.promoCode === value
+                      );
+                      setSelectedPromotion(promo || null);
+                      form.setFieldsValue({ promotionCode: value });
+                    } else {
+                      setSelectedPromotion(null);
+                      form.setFieldsValue({ promotionCode: undefined });
+                    }
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  <Select.Option value="none">
+                    <div style={{ fontStyle: "italic", color: "#666" }}>
+                      Không áp dụng mã
+                    </div>
+                  </Select.Option>
+                  {promotions
+                    .filter(
+                      (promo) =>
+                        promo.status === "active" &&
+                        (!selectedPromotionType ||
+                          promo.applyType === selectedPromotionType)
+                    )
+                    .map((promo) => {
+                      const { discount, isEligible, requiredAmount } =
+                        calculatePromotionDiscount(promo);
+                      return (
+                        <Select.Option
+                          key={promo.promoId}
+                          value={promo.promoCode}
+                          label={`${promo.promoCode} - ${
+                            isEligible
+                              ? `Giảm ${discount.toLocaleString("vi-VN")}đ`
+                              : `Cần thêm ${requiredAmount.toLocaleString(
+                                  "vi-VN"
+                                )}đ`
+                          }`}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "4px 0",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "14px",
+                                fontWeight: "bold",
+                                color: isEligible ? "#000" : "#999",
+                              }}
+                            >
+                              {promo.promoCode}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: isEligible ? "#52c41a" : "#ff4d4f",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              {isEligible
+                                ? `Giảm ${discount.toLocaleString("vi-VN")}đ`
+                                : `Cần thêm ${requiredAmount.toLocaleString(
+                                    "vi-VN"
+                                  )}đ`}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              color: "#666",
+                              marginTop: "2px",
+                              lineHeight: "1.4",
+                            }}
+                          >
+                            <span style={{ color: "#1890ff" }}>
+                              {promo.discountValue}
+                              {promo.discountType === "percent" ? "%" : "đ"}
+                            </span>
+                            <span style={{ marginLeft: "8px" }}>
+                              {promo.applyType === "order"
+                                ? "cho bill"
+                                : promo.applyType === "product"
+                                ? "cho sản phẩm"
+                                : "combo"}
+                            </span>
+                            {!isEligible && (
+                              <div
+                                style={{
+                                  color: "#ff4d4f",
+                                  fontSize: "11px",
+                                  marginTop: "2px",
+                                }}
+                              >
+                                Đơn tối thiểu:{" "}
+                                {promo.minOrderAmount.toLocaleString("vi-VN")}đ
+                              </div>
+                            )}
+                          </div>
+                        </Select.Option>
+                      );
+                    })}
+                </Select>
+                <Button
+                  icon={<EyeOutlined />}
+                  disabled={
+                    !selectedPromotion ||
+                    form.getFieldValue("promotionCode") === "none"
+                  }
+                  onClick={() => setPromotionDetailVisible(true)}
+                  style={{
+                    borderLeft: 0,
+                    borderColor:
+                      selectedPromotion &&
+                      form.getFieldValue("promotionCode") !== "none"
+                        ? "#d9d9d9"
+                        : "#f0f0f0",
+                    backgroundColor:
+                      selectedPromotion &&
+                      form.getFieldValue("promotionCode") !== "none"
+                        ? "#fff"
+                        : "#f5f5f5",
+                  }}
+                >
+                  Chi tiết
+                </Button>
+                {selectedPromotion &&
+                  form.getFieldValue("promotionCode") !== "none" && (
+                    <Button
+                      danger
+                      icon={<CloseOutlined />}
+                      onClick={() => {
+                        form.setFieldsValue({ promotionCode: "none" });
+                        setSelectedPromotion(null);
+                      }}
+                      style={{ borderLeft: 0 }}
+                    >
+                      Bỏ áp dụng
+                    </Button>
+                  )}
+              </Space.Compact>
+            </Form.Item>
+          </Col>
+        </Row>
       </Form>
 
-      {/* Barcode Scanner Modal */}
-      <BarcodeScanner
-        visible={showScanner}
-        onClose={() => setShowScanner(false)}
-        onScan={handleBarcodeScan}
-      />
+      {/* Promotion Detail Modal */}
+      <Modal
+        title="Chi tiết khuyến mãi"
+        open={promotionDetailVisible}
+        onCancel={() => setPromotionDetailVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setPromotionDetailVisible(false)}>
+            Đóng
+          </Button>,
+        ]}
+        width={600}
+      >
+        {selectedPromotion && (
+          <div>
+            <Row gutter={16}>
+              <Col span={12}>
+                <strong>Mã khuyến mãi:</strong> {selectedPromotion.promoCode}
+              </Col>
+              <Col span={12}>
+                <strong>Mô tả:</strong>{" "}
+                {selectedPromotion.description || "Không có"}
+              </Col>
+            </Row>
+            <Row gutter={16} style={{ marginTop: 8 }}>
+              <Col span={12}>
+                <strong>Loại:</strong>{" "}
+                {selectedPromotion.applyType === "order"
+                  ? "Theo bill"
+                  : selectedPromotion.applyType === "product"
+                  ? "Theo sản phẩm"
+                  : "Combo"}
+              </Col>
+              <Col span={12}>
+                <strong>Giảm giá:</strong> {selectedPromotion.discountValue}
+                {selectedPromotion.discountType === "percent" ? "%" : "đ"}
+              </Col>
+            </Row>
+            <Row gutter={16} style={{ marginTop: 8 }}>
+              <Col span={12}>
+                <strong>Ngày bắt đầu:</strong>{" "}
+                {new Date(selectedPromotion.startDate).toLocaleDateString(
+                  "vi-VN"
+                )}
+              </Col>
+              <Col span={12}>
+                <strong>Ngày kết thúc:</strong>{" "}
+                {new Date(selectedPromotion.endDate).toLocaleDateString(
+                  "vi-VN"
+                )}
+              </Col>
+            </Row>
+            <Row gutter={16} style={{ marginTop: 8 }}>
+              <Col span={12}>
+                <strong>Đơn hàng tối thiểu:</strong>{" "}
+                {selectedPromotion.minOrderAmount.toLocaleString("vi-VN")}đ
+              </Col>
+              <Col span={12}>
+                <strong>Lượt sử dụng còn lại:</strong>{" "}
+                {selectedPromotion.usageLimit === 0
+                  ? "Không giới hạn"
+                  : `${
+                      selectedPromotion.usageLimit - selectedPromotion.usedCount
+                    }/${selectedPromotion.usageLimit}`}
+              </Col>
+            </Row>
+            {selectedPromotion.products &&
+              selectedPromotion.products.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <Divider style={{ margin: "8px 0", fontSize: "14px" }}>
+                    Sản phẩm áp dụng
+                  </Divider>
+                  <div>
+                    {selectedPromotion.products.map((product, index) => (
+                      <Row
+                        key={index}
+                        gutter={16}
+                        style={{
+                          padding: "8px 0",
+                          borderBottom:
+                            index < selectedPromotion.products!.length - 1
+                              ? "1px solid #f0f0f0"
+                              : "none",
+                        }}
+                      >
+                        <Col span={16}>
+                          <strong>{product.productName}</strong>
+                        </Col>
+                        <Col span={8} style={{ textAlign: "right" }}>
+                          <span
+                            style={{ color: "#52c41a", fontWeight: "bold" }}
+                          >
+                            Giảm {selectedPromotion.discountValue}
+                            {selectedPromotion.discountType === "percent"
+                              ? "%"
+                              : "đ"}
+                          </span>
+                        </Col>
+                      </Row>
+                    ))}
+                  </div>
+                </div>
+              )}
+            {selectedPromotion.description && (
+              <Row gutter={16} style={{ marginTop: 8 }}>
+                <Col span={24}>
+                  <strong>Mô tả:</strong> {selectedPromotion.description}
+                </Col>
+              </Row>
+            )}
+          </div>
+        )}
+      </Modal>
     </Modal>
   );
 };

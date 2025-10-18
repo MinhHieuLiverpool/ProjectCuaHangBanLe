@@ -409,6 +409,7 @@ const AuditLogsPage: React.FC = () => {
                 pageSize: filter.pageSize,
                 total: total,
                 showSizeChanger: true,
+                pageSizeOptions: ["10", "50", "100"],
                 showTotal: (total) => `Tổng ${total} bản ghi`,
                 onChange: (page, pageSize) => {
                   setFilter({ ...filter, page, pageSize });
@@ -469,14 +470,6 @@ const AuditLogsPage: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label="User ID" span={1}>
                 {selectedLog.userId || "N/A"}
-              </Descriptions.Item>
-              <Descriptions.Item label="IP Address" span={2}>
-                {selectedLog.ipAddress || "N/A"}
-              </Descriptions.Item>
-              <Descriptions.Item label="User Agent" span={2}>
-                <Typography.Text ellipsis style={{ maxWidth: 700 }}>
-                  {selectedLog.userAgent || "N/A"}
-                </Typography.Text>
               </Descriptions.Item>
               <Descriptions.Item label="Mô tả thay đổi" span={2}>
                 {selectedLog.changesSummary || "N/A"}

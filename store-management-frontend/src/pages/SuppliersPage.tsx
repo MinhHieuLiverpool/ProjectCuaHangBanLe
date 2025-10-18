@@ -10,7 +10,7 @@ import {
   Popconfirm,
   Tag,
 } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
 import { Supplier } from "@/types";
 import { supplierService } from "@/services/common.service";
 
@@ -20,6 +20,8 @@ const SuppliersPage: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [form] = Form.useForm();
+  // Cache để lưu thông tin có thể xóa hẳn không
+  const [canDeleteMap, setCanDeleteMap] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     fetchData();
@@ -30,6 +32,20 @@ const SuppliersPage: React.FC = () => {
     try {
       const data = await supplierService.getAll();
       setSuppliers(data);
+
+      // Kiểm tra từng supplier xem có thể xóa hẳn không
+      const canDeleteChecks: Record<number, boolean> = {};
+      for (const supplier of data) {
+        if (supplier.status === "active") {
+          try {
+            const checkResult = await supplierService.canDelete(supplier.supplierId);
+            canDeleteChecks[supplier.supplierId] = checkResult.canHardDelete;
+          } catch {
+            canDeleteChecks[supplier.supplierId] = false;
+          }
+        }
+      }
+      setCanDeleteMap(canDeleteChecks);
     } catch (error) {
       message.error("Không thể tải dữ liệu!");
     } finally {
@@ -61,20 +77,22 @@ const SuppliersPage: React.FC = () => {
     }
   };
 
+  const handleHide = async (supplierId: number) => {
+    try {
+      const response = await supplierService.hide(supplierId);
+      message.success(response.message || "Đã ẩn nhà cung cấp thành công!");
+      fetchData();
+    } catch (error: any) {
+      message.error(
+        error.response?.data?.message || "Ẩn nhà cung cấp thất bại!"
+      );
+    }
+  };
+
   const handleDelete = async (supplierId: number) => {
     try {
       const response = await supplierService.delete(supplierId);
-
-      // Kiểm tra xem có phải soft delete không
-      if (response.softDeleted) {
-        message.warning(
-          response.message ||
-            "Nhà cung cấp có dữ liệu liên quan nên đã được ẩn thay vì xóa"
-        );
-      } else {
-        message.success(response.message || "Xóa nhà cung cấp thành công!");
-      }
-
+      message.success(response.message || "Xóa nhà cung cấp thành công!");
       fetchData();
     } catch (error: any) {
       message.error(
@@ -157,16 +175,28 @@ const SuppliersPage: React.FC = () => {
               style={{ color: "green" }}
               onClick={() => handleRestore(record.supplierId)}
             >
-              Hiện lại
+              Khôi phục
             </Button>
-          ) : (
+          ) : canDeleteMap[record.supplierId] ? (
             <Popconfirm
               title="Xóa nhà cung cấp?"
-              description="Nếu có sản phẩm hoặc đơn nhập hàng liên quan, nhà cung cấp sẽ được ẩn thay vì xóa."
+              description="Nhà cung cấp này chưa có dữ liệu liên quan và sẽ bị xóa hoàn toàn."
               onConfirm={() => handleDelete(record.supplierId)}
+              okType="danger"
             >
               <Button type="link" danger icon={<DeleteOutlined />}>
                 Xóa
+              </Button>
+            </Popconfirm>
+          ) : (
+            <Popconfirm
+              title="Ẩn nhà cung cấp?"
+              description="Nhà cung cấp này có sản phẩm hoặc đơn nhập hàng liên quan, chỉ có thể ẩn."
+              onConfirm={() => handleHide(record.supplierId)}
+              okType="danger"
+            >
+              <Button type="link" danger icon={<EyeInvisibleOutlined />}>
+                Ẩn
               </Button>
             </Popconfirm>
           )}
@@ -195,7 +225,12 @@ const SuppliersPage: React.FC = () => {
         dataSource={suppliers}
         rowKey="supplierId"
         loading={loading}
-        pagination={{ pageSize: 10 }}
+        pagination={{
+          defaultPageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ["10", "50", "100"],
+          showTotal: (total) => `Tổng ${total} mục`,
+        }}
       />
 
       <Modal

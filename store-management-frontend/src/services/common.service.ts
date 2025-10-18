@@ -21,9 +21,18 @@ export const customerService = {
     const response = await apiClient.put<Customer>(`/customers/${id}`, data);
     return response.data;
   },
-  async delete(id: number): Promise<void> {
-    await apiClient.delete(`/customers/${id}`);
-  },
+
+async updateStatus(customerId: number, status: string): Promise<any> {
+  const response = await apiClient.patch(`/customers/${customerId}/status`, { status });
+  return response.data;
+},
+
+
+async delete(id: number): Promise<DeleteResponse> {
+  const response = await apiClient.delete<DeleteResponse>(`/customers/${id}`);
+  return response.data;
+},
+
 async checkPhoneExists(phone: string): Promise<boolean> {
   const response = await apiClient.get<{ exists: boolean }>(
     `/customers/check-phone`,

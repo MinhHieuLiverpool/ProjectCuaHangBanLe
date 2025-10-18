@@ -10,6 +10,7 @@ import {
   Popconfirm,
   Space,
   Table,
+  Tag,
 } from "antd";
 import {
   DeleteOutlined,
@@ -31,6 +32,10 @@ const CustomersPage: React.FC = () => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
+  const [isEdit, setIsEdit] = useState(false);
+const [currentCustomer, setCurrentCustomer] = useState<{ phone?: string } | null>(null);
+
+
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -41,6 +46,12 @@ const CustomersPage: React.FC = () => {
     filterCustomers();
   }, [customers, searchText]);
 
+useEffect(() => {
+  if (isEdit && editingCustomer) {
+    setCurrentCustomer(editingCustomer); // sử dụng editingCustomer
+    form.setFieldsValue(editingCustomer); // điền dữ liệu vào form
+  }
+}, [isEdit, editingCustomer]);
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -71,12 +82,14 @@ const CustomersPage: React.FC = () => {
   };
 
   const handleCreate = () => {
+    setIsEdit(false);
     setEditingCustomer(null);
     form.resetFields();
     setModalVisible(true);
   };
 
   const handleEdit = (customer: Customer) => {
+    setIsEdit(true);
     setEditingCustomer(customer);
     form.setFieldsValue(customer);
     setModalVisible(true);
@@ -139,15 +152,46 @@ const CustomersPage: React.FC = () => {
     setFilteredCustomer(customers);
   };
 
-  const handleDelete = async (customerId: number) => {
+  const handleDelete = async (id: number) => {
     try {
-      await customerService.delete(customerId);
-      message.success("Xóa khách hàng thành công!");
+      const response = await customerService.delete(id);
+
+      // Kiểm tra xem có phải soft delete không
+      if (response.softDeleted) {
+        message.warning(
+          response.message || "Khách hàng đã được bán nên đã được ẩn thay vì xóa"
+        );
+      } else {
+        message.success(response.message || "Xóa khách hàng thành công!");
+      }
+
       fetchData();
-    } catch (error) {
-      message.error("Xóa khách hàng thất bại!");
+    } catch (error: any) {
+      message.error(error.response?.data?.message || "Xóa khách hàng thất bại!");
     }
   };
+
+const handleToggleStatus = async (customerId: number, newStatus: "active" | "inactive") => {
+  try {
+    await customerService.updateStatus(customerId, newStatus);
+    message.success(
+      newStatus === "active"
+        ? "Hiển thị khách hàng thành công!"
+        : "Ẩn khách hàng thành công!"
+    );
+
+    // Cập nhật trực tiếp state
+    setCustomers((prev) =>
+      prev.map((c) =>
+        c.customerId === customerId ? { ...c, status: newStatus } : c
+      )
+    );
+  } catch (error: any) {
+    console.error(error);
+    message.error(error.response?.data?.message || "Cập nhật trạng thái thất bại!");
+  }
+};
+
 
   const handleSubmit = async () => {
     try {
@@ -218,8 +262,34 @@ const CustomersPage: React.FC = () => {
           >
             Sửa
           </Button>
+          {record.status === "active" ? (
+            <Button
+              type="default"
+              size="small"
+              onClick={() => handleToggleStatus(record.customerId, "inactive")}
+              style={{ color: "orange" }}
+            >
+              Ẩn
+            </Button>
+          ) : (
+            <Button
+              type="default"
+              size="small"
+              onClick={() => handleToggleStatus(record.customerId, "active")}
+              style={{ color: "green" }}
+            >
+              Hiện
+            </Button>
+          )}
           <Popconfirm
-            title="Bạn có chắc muốn xóa?"
+            title={
+              <div>
+                <div>Bạn có chắc muốn xóa?</div>
+                <div style={{ fontSize: "12px", color: "#666", marginTop: 4 }}>
+                  * Khách hàng sẽ được ẩn thay vì xóa
+                </div>
+              </div>
+            }
             onConfirm={() => handleDelete(record.customerId)}
           >
             <Button
@@ -309,22 +379,26 @@ const CustomersPage: React.FC = () => {
                 message: "Số điện thoại phải gồm 10-11 chữ số!",
               },
               {
-                validator: async (_, value) => {
-                  if (!value) return Promise.resolve();
+  validator: async (_, value) => {
+    if (!value) return Promise.resolve();
 
-                  try {
-                    const exists = await customerService.checkPhoneExists(
-                      value
-                    ); // trả về boolean
-                    if (exists) {
-                      return Promise.reject("Số điện thoại đã tồn tại!");
-                    }
-                    return Promise.resolve();
-                  } catch (err) {
-                    return Promise.reject("Không thể kiểm tra số điện thoại!");
-                  }
-                },
-              },
+    // bỏ qua nếu số điện thoại chưa đổi
+    if (currentCustomer && value === currentCustomer.phone) {
+      return Promise.resolve();
+    }
+
+    try {
+      const exists = await customerService.checkPhoneExists(value); // trả về boolean
+      if (exists) {
+        return Promise.reject("Số điện thoại đã tồn tại!");
+      }
+      return Promise.resolve();
+    } catch (err) {
+      return Promise.reject("Không thể kiểm tra số điện thoại!");
+    }
+  }
+},
+
             ]}
           >
             <Input />
@@ -403,6 +477,15 @@ const CustomersPage: React.FC = () => {
             <Descriptions bordered column={2} size="small">
               <Descriptions.Item label="Mã khách hàng" span={1}>
                 <strong>{viewingCustomer.customerId}</strong>
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái" span={1}>
+                <Tag
+                  color={viewingCustomer.status === "active" ? "green" : "red"}
+                >
+                  {viewingCustomer.status === "active"
+                    ? "Đang hoạt động"
+                    : "Ngừng hoạt động"}
+                </Tag>
               </Descriptions.Item>
 
               <Descriptions.Item label="Ngày tạo" span={1}>

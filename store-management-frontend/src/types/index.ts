@@ -86,6 +86,7 @@ export interface Customer {
   email?: string;
   address?: string;
   createdAt: string;
+  status: string;
 }
 
 export interface Promotion {

@@ -284,6 +284,9 @@ const SuppliersPage: React.FC = () => {
                             {
                                 validator: async (_, value) => {
                                     if (!value) return Promise.resolve();
+                                    if (editingSupplier && value === editingSupplier.phone) {
+                                        return Promise.resolve();
+                                    }
                                     const exists = await supplierService.checkPhoneExists(value);
                                     if (exists) {
                                         return Promise.reject(new Error("Số điện thoại đã được sử dụng!"));
@@ -305,6 +308,9 @@ const SuppliersPage: React.FC = () => {
                             {
                                 validator: async (_, value) => {
                                     if (!value) return Promise.resolve();
+                                    if (editingSupplier && value === editingSupplier.email) {
+                                        return Promise.resolve();
+                                    }
                                     const exists = await supplierService.checkEmailExists(value);
                                     if (exists) {
                                         return Promise.reject(new Error("Email đã được sử dụng!"));

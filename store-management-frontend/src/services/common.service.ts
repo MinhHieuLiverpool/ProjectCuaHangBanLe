@@ -55,12 +55,22 @@ export const categoryService = {
     );
     return response.data;
   },
-  async create(data: Omit<Category, "categoryId">): Promise<Category> {
-    const response = await apiClient.post<Category>("/categories", data);
+      async create(data: Omit<Category, "categoryId">): Promise<Category> {
+    const response = await apiClient.post<Category>("/categories", data).catch((error) => {
+      if (error.response?.status === 400 && error.response.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw error;
+    });
     return response.data;
   },
   async update(id: number, data: Partial<Category>): Promise<Category> {
-    const response = await apiClient.put<Category>(`/categories/${id}`, data);
+    const response = await apiClient.put<Category>(`/categories/${id}`, data).catch((error) => {
+      if (error.response?.status === 400 && error.response.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw error;
+    });
     return response.data;
   },
   async restore(id: number): Promise<void> {

@@ -117,12 +117,24 @@ namespace StoreManagementAPI.Controllers
         }
 
         [HttpPost]
-        // [Authorize] - B? AUTHENTICATION // Chỉ admin mới được tạo mới
+        // [Authorize]
         public async Task<ActionResult<Category>> Create([FromBody] Category category)
         {
+            // 🔍 Kiểm tra trùng tên (không phân biệt hoa thường)
+            var exists = await _categoryRepository.FindAsync(c =>
+                c.CategoryName.ToLower() == category.CategoryName.ToLower());
+            if (exists.Any())
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Tên danh mục đã tồn tại."
+                });
+            }
+
             var created = await _categoryRepository.AddAsync(category);
-            
-            // Log audit
+
+            // 🧾 Ghi log audit
             try
             {
                 LogAudit(
@@ -142,19 +154,31 @@ namespace StoreManagementAPI.Controllers
             }
             catch (Exception ex)
             {
-                // Log error nhưng vẫn trả về kết quả thành công
                 Console.WriteLine($"Audit log error: {ex.Message}");
             }
-            
+
             return CreatedAtAction(nameof(GetById), new { id = created.CategoryId }, created);
         }
 
         [HttpPut("{id}")]
-        // [Authorize] - B? AUTHENTICATION // Chỉ admin mới được cập nhật
+        // [Authorize]
         public async Task<ActionResult<Category>> Update(int id, [FromBody] Category category)
         {
             var existing = await _categoryRepository.GetByIdAsync(id);
-            if (existing == null) return NotFound();
+            if (existing == null)
+                return NotFound(new { success = false, message = "Không tìm thấy danh mục." });
+
+            // 🔍 Kiểm tra trùng tên (loại trừ chính nó)
+            var duplicate = await _categoryRepository.FindAsync(c =>
+                c.CategoryId != id && c.CategoryName.ToLower() == category.CategoryName.ToLower());
+            if (duplicate.Any())
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Tên danh mục đã tồn tại."
+                });
+            }
 
             var oldValues = new
             {
@@ -167,8 +191,8 @@ namespace StoreManagementAPI.Controllers
             existing.CategoryName = category.CategoryName;
 
             var updated = await _categoryRepository.UpdateAsync(existing);
-            
-            // Log audit
+
+            // 🧾 Ghi log audit
             LogAudit(
                 action: "UPDATE",
                 entity: "Category",
@@ -183,9 +207,10 @@ namespace StoreManagementAPI.Controllers
                     updated.Status
                 }
             );
-            
+
             return Ok(updated);
         }
+
 
         [HttpPatch("{id}/restore")]
         // [Authorize] - B? AUTHENTICATION // Chỉ admin mới được khôi phục

@@ -149,21 +149,22 @@ const CategoriesPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    try {
-      const values = await form.validateFields();
-      if (editingCategory) {
-        await categoryService.update(editingCategory.categoryId, values);
-        message.success("Cập nhật danh mục thành công!");
-      } else {
-        await categoryService.create(values);
-        message.success("Thêm danh mục thành công!");
-      }
-      setModalVisible(false);
-      fetchData();
-    } catch (error) {
-      message.error("Lưu danh mục thất bại!");
+  try {
+    const values = await form.validateFields();
+    if (editingCategory) {
+      await categoryService.update(editingCategory.categoryId, values);
+      message.success("Cập nhật danh mục thành công!");
+    } else {
+      await categoryService.create(values);
+      message.success("Thêm danh mục thành công!");
     }
-  };
+    setModalVisible(false);
+    fetchData();
+  } catch (error: any) {
+    message.error(error.message || "Lưu danh mục thất bại!");
+  }
+};
+
 
   // Lọc & tìm kiếm dữ liệu hiển thị
   const filteredCategories = categories.filter((cat) => {

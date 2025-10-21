@@ -76,6 +76,16 @@ export const categoryService = {
     );
     return response.data;
   },
+    async filter(search?: string, status?: string): Promise<Category[]> {
+    const params = new URLSearchParams();
+    if (search) params.append("search", search);
+    if (status && status !== "all") params.append("status", status);
+
+    const response = await apiClient.get<Category[]>(
+      `/categories/filter?${params.toString()}`
+    );
+    return response.data;
+  },
 };
 
 export const supplierService = {

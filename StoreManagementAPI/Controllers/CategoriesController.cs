@@ -339,5 +339,33 @@ namespace StoreManagementAPI.Controllers
                 ProductCount = activeProducts.Count
             });
         }
+
+        [HttpGet("filter")]
+        public async Task<ActionResult<IEnumerable<Category>>> Filter(
+            [FromQuery] string? search = null,
+            [FromQuery] string? status = "all")
+        {
+            var query = _context.Categories.AsQueryable();
+
+            // Lọc theo trạng thái
+            if (!string.IsNullOrEmpty(status) && status.ToLower() != "all")
+            {
+                query = query.Where(c => c.Status.ToLower() == status.ToLower());
+            }
+
+            // Tìm kiếm theo tên
+            if (!string.IsNullOrEmpty(search))
+            {
+                query = query.Where(c => c.CategoryName.Contains(search));
+            }
+
+            var categories = await query
+                .OrderByDescending(c => c.CategoryId)
+                .ToListAsync();
+
+            return Ok(categories);
+        }
+
+
     }
 }

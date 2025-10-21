@@ -8,8 +8,14 @@ import {
   Input,
   message,
   Tag,
+  Select,
 } from "antd";
-import { PlusOutlined, EditOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
+import {
+  PlusOutlined,
+  EditOutlined,
+  EyeInvisibleOutlined,
+  SearchOutlined,
+} from "@ant-design/icons";
 import { Category, CategoryProduct, CategoryDeleteRequest } from "@/types";
 import { categoryService } from "@/services/common.service";
 import CategoryDeleteModal from "@/components/CategoryDeleteModal";
@@ -21,10 +27,20 @@ const CategoriesPage: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [form] = Form.useForm();
 
-  // States for delete modal
+  // States cho modal xóa/ẩn danh mục
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
-  const [categoryProducts, setCategoryProducts] = useState<CategoryProduct[]>([]);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(
+    null
+  );
+  const [categoryProducts, setCategoryProducts] = useState<CategoryProduct[]>(
+    []
+  );
+
+  // Tìm kiếm và lọc
+  const [searchValue, setSearchValue] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "inactive"
+  >("all");
 
   useEffect(() => {
     fetchData();
@@ -81,9 +97,10 @@ const CategoriesPage: React.FC = () => {
           okType: "danger",
           onOk: async () => {
             try {
-              const response = await categoryService.hide(category.categoryId, {
-                hideProducts: false,
-              });
+              const response = await categoryService.hide(
+                category.categoryId,
+                { hideProducts: false }
+              );
               message.success(response.message || "Đã ẩn danh mục thành công!");
               fetchData();
             } catch (error: any) {
@@ -148,6 +165,16 @@ const CategoriesPage: React.FC = () => {
     }
   };
 
+  // Lọc & tìm kiếm dữ liệu hiển thị
+  const filteredCategories = categories.filter((cat) => {
+    const matchSearch = cat.categoryName
+      .toLowerCase()
+      .includes(searchValue.toLowerCase());
+    const matchStatus =
+      statusFilter === "all" ? true : cat.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
   const columns = [
     {
       title: "Mã DM",
@@ -209,22 +236,47 @@ const CategoriesPage: React.FC = () => {
 
   return (
     <div>
+      {/* --- Header giống SuppliersPage --- */}
       <div
         style={{
           marginBottom: 16,
           display: "flex",
           justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
         <h2>Quản lý danh mục</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Thêm danh mục
-        </Button>
+        <Space>
+          <Input
+            placeholder="Tìm kiếm danh mục..."
+            allowClear
+            prefix={<SearchOutlined />}
+            style={{ width: 300 }}
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+          />
+          <Select
+            value={statusFilter}
+            style={{ width: 150 }}
+            onChange={(value) =>
+              setStatusFilter(value as "all" | "active" | "inactive")
+            }
+            options={[
+              { value: "all", label: "Tất cả" },
+              { value: "active", label: "Hoạt động" },
+              { value: "inactive", label: "Đã ẩn" },
+            ]}
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            Thêm danh mục
+          </Button>
+        </Space>
       </div>
 
+      {/* --- Bảng danh mục --- */}
       <Table
         columns={columns}
-        dataSource={categories}
+        dataSource={filteredCategories}
         rowKey="categoryId"
         loading={loading}
         pagination={{
@@ -235,6 +287,7 @@ const CategoriesPage: React.FC = () => {
         }}
       />
 
+      {/* --- Modal thêm/sửa --- */}
       <Modal
         title={editingCategory ? "Cập nhật danh mục" : "Thêm danh mục"}
         open={modalVisible}
@@ -252,6 +305,7 @@ const CategoriesPage: React.FC = () => {
         </Form>
       </Modal>
 
+      {/* --- Modal ẩn danh mục có sản phẩm --- */}
       <CategoryDeleteModal
         visible={deleteModalVisible}
         category={deletingCategory}

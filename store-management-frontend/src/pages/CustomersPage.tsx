@@ -11,6 +11,7 @@ import {
   Space,
   Table,
   Tag,
+  Select,
 } from "antd";
 import {
   DeleteOutlined,
@@ -27,14 +28,18 @@ const CustomersPage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomer, setFilteredCustomer] = useState<Customer[]>([]);
   const [searchText, setSearchText] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "inactive"
+  >("all");
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
   const [isEdit, setIsEdit] = useState(false);
-const [currentCustomer, setCurrentCustomer] = useState<{ phone?: string } | null>(null);
-
+  const [currentCustomer, setCurrentCustomer] = useState<{
+    phone?: string;
+  } | null>(null);
 
   const [form] = Form.useForm();
 
@@ -42,16 +47,23 @@ const [currentCustomer, setCurrentCustomer] = useState<{ phone?: string } | null
     fetchData();
   }, []);
 
-  useEffect(() => {
-    filterCustomers();
-  }, [customers, searchText]);
-
 useEffect(() => {
-  if (isEdit && editingCustomer) {
-    setCurrentCustomer(editingCustomer); // sử dụng editingCustomer
-    form.setFieldsValue(editingCustomer); // điền dữ liệu vào form
-  }
-}, [isEdit, editingCustomer]);
+    filterCustomers();
+  }, [customers, searchText, statusFilter]); // Lắng nghe cả 3 biến để lọc lại
+
+  useEffect(() => {
+    if (isEdit && editingCustomer) {
+      setCurrentCustomer(editingCustomer);
+      form.setFieldsValue(editingCustomer);
+    }
+  }, [isEdit, editingCustomer, form]);
+
+  useEffect(() => {
+    if (isEdit && editingCustomer) {
+      setCurrentCustomer(editingCustomer); // sử dụng editingCustomer
+      form.setFieldsValue(editingCustomer); // điền dữ liệu vào form
+    }
+  }, [isEdit, editingCustomer]);
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -77,6 +89,11 @@ useEffect(() => {
           c.address?.toLowerCase().includes(search)
       );
     }
+      // Lọc theo status
+  if (statusFilter !== "all") {
+    filtered = filtered.filter((c) => c.status === statusFilter);
+  }
+
 
     setFilteredCustomer(filtered);
   };
@@ -159,7 +176,8 @@ useEffect(() => {
       // Kiểm tra xem có phải soft delete không
       if (response.softDeleted) {
         message.warning(
-          response.message || "Khách hàng đã được bán nên đã được ẩn thay vì xóa"
+          response.message ||
+            "Khách hàng đã được bán nên đã được ẩn thay vì xóa"
         );
       } else {
         message.success(response.message || "Xóa khách hàng thành công!");
@@ -167,31 +185,37 @@ useEffect(() => {
 
       fetchData();
     } catch (error: any) {
-      message.error(error.response?.data?.message || "Xóa khách hàng thất bại!");
+      message.error(
+        error.response?.data?.message || "Xóa khách hàng thất bại!"
+      );
     }
   };
 
-const handleToggleStatus = async (customerId: number, newStatus: "active" | "inactive") => {
-  try {
-    await customerService.updateStatus(customerId, newStatus);
-    message.success(
-      newStatus === "active"
-        ? "Hiển thị khách hàng thành công!"
-        : "Ẩn khách hàng thành công!"
-    );
+  const handleToggleStatus = async (
+    customerId: number,
+    newStatus: "active" | "inactive"
+  ) => {
+    try {
+      await customerService.updateStatus(customerId, newStatus);
+      message.success(
+        newStatus === "active"
+          ? "Hiển thị khách hàng thành công!"
+          : "Ẩn khách hàng thành công!"
+      );
 
-    // Cập nhật trực tiếp state
-    setCustomers((prev) =>
-      prev.map((c) =>
-        c.customerId === customerId ? { ...c, status: newStatus } : c
-      )
-    );
-  } catch (error: any) {
-    console.error(error);
-    message.error(error.response?.data?.message || "Cập nhật trạng thái thất bại!");
-  }
-};
-
+      // Cập nhật trực tiếp state
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c.customerId === customerId ? { ...c, status: newStatus } : c
+        )
+      );
+    } catch (error: any) {
+      console.error(error);
+      message.error(
+        error.response?.data?.message || "Cập nhật trạng thái thất bại!"
+      );
+    }
+  };
 
   const handleSubmit = async () => {
     try {
@@ -313,10 +337,25 @@ const handleToggleStatus = async (customerId: number, newStatus: "active" | "ina
           marginBottom: 16,
           display: "flex",
           justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
         <h2>Quản lý khách hàng</h2>
         <Space>
+                  <Select
+          value={statusFilter}
+          style={{ width: 150 }}
+          onChange={(value) =>
+            setStatusFilter(value as "all" | "active" | "inactive")
+          }
+          options={[
+            { value: "all", label: "Tất cả" },
+            { value: "active", label: "Hoạt động" },
+            { value: "inactive", label: "Đã ẩn" },
+          ]}
+        />
+
+
           <Button
             type="default"
             icon={<DownloadOutlined />}
@@ -327,16 +366,20 @@ const handleToggleStatus = async (customerId: number, newStatus: "active" | "ina
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
             Thêm khách hàng
           </Button>
+          
         </Space>
       </div>
 
       {/* Bộ lọc nâng cao cho Khách hàng */}
-      <AdvancedSearchFilter
-        searchText={searchText}
-        onSearchChange={setSearchText}
-        searchPlaceholder="Tìm kiếm theo tên, số điện thoại hoặc email..."
-        onReset={handleResetFilters}
-      ></AdvancedSearchFilter>
+
+        <AdvancedSearchFilter
+          searchText={searchText}
+          onSearchChange={setSearchText}
+          searchPlaceholder="Tìm kiếm theo tên, số điện thoại hoặc email..."
+
+          onReset={handleResetFilters}
+        ></AdvancedSearchFilter>
+
 
       <Table
         columns={columns}
@@ -384,26 +427,27 @@ const handleToggleStatus = async (customerId: number, newStatus: "active" | "ina
                 message: "Số điện thoại phải gồm 10-11 chữ số!",
               },
               {
-  validator: async (_, value) => {
-    if (!value) return Promise.resolve();
+                validator: async (_, value) => {
+                  if (!value) return Promise.resolve();
 
-    // bỏ qua nếu số điện thoại chưa đổi
-    if (currentCustomer && value === currentCustomer.phone) {
-      return Promise.resolve();
-    }
+                  // bỏ qua nếu số điện thoại chưa đổi
+                  if (currentCustomer && value === currentCustomer.phone) {
+                    return Promise.resolve();
+                  }
 
-    try {
-      const exists = await customerService.checkPhoneExists(value); // trả về boolean
-      if (exists) {
-        return Promise.reject("Số điện thoại đã tồn tại!");
-      }
-      return Promise.resolve();
-    } catch (err) {
-      return Promise.reject("Không thể kiểm tra số điện thoại!");
-    }
-  }
-},
-
+                  try {
+                    const exists = await customerService.checkPhoneExists(
+                      value
+                    ); // trả về boolean
+                    if (exists) {
+                      return Promise.reject("Số điện thoại đã tồn tại!");
+                    }
+                    return Promise.resolve();
+                  } catch (err) {
+                    return Promise.reject("Không thể kiểm tra số điện thoại!");
+                  }
+                },
+              },
             ]}
           >
             <Input />

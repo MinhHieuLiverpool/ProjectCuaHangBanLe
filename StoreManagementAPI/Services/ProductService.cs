@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using StoreManagementAPI.Data;
 using StoreManagementAPI.DTOs;
 using StoreManagementAPI.Models;
@@ -30,22 +30,17 @@ namespace StoreManagementAPI.Services
     {
         private readonly IRepository<Product> _productRepository;
         private readonly IRepository<Inventory> _inventoryRepository;
-        private readonly StoreDbContext _context;
-        private readonly IAuditLogService _auditLogService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly StoreDbContext _context;        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public ProductService(
             IRepository<Product> productRepository,
             IRepository<Inventory> inventoryRepository,
             StoreDbContext context,
-            IAuditLogService auditLogService,
             IHttpContextAccessor httpContextAccessor)
         {
             _productRepository = productRepository;
             _inventoryRepository = inventoryRepository;
-            _context = context;
-            _auditLogService = auditLogService;
-            _httpContextAccessor = httpContextAccessor;
+            _context = context;            _httpContextAccessor = httpContextAccessor;
         }
 
         private (int? userId, string? username) GetAuditInfo()
@@ -242,29 +237,7 @@ namespace StoreManagementAPI.Services
                 };
                 await _inventoryRepository.AddAsync(inventory);
 
-                // Log audit
-                var (userId, username) = GetAuditInfo();
-                await _auditLogService.LogActionAsync(
-                    action: "CREATE",
-                    entityType: "Product",
-                    entityId: createdProduct.ProductId,
-                    entityName: createdProduct.ProductName,
-                    oldValues: null,
-                    newValues: new
-                    {
-                        ProductId = createdProduct.ProductId,
-                        ProductName = createdProduct.ProductName,
-                        Barcode = createdProduct.Barcode,
-                        Price = createdProduct.Price,
-                        CostPrice = createdProduct.CostPrice,
-                        CategoryId = createdProduct.CategoryId,
-                        SupplierId = createdProduct.SupplierId,
-                        Unit = createdProduct.Unit
-                    },
-                    changesSummary: $"Tạo sản phẩm mới: {createdProduct.ProductName} (Barcode: {createdProduct.Barcode}, Giá: {createdProduct.Price:N0} VNĐ)",
-                    userId: userId,
-                    username: username
-                );
+                
 
                 // Commit transaction nếu mọi thứ thành công
                 await transaction.CommitAsync();
@@ -396,34 +369,6 @@ namespace StoreManagementAPI.Services
 
                 await _productRepository.UpdateAsync(product);
 
-                // Log audit
-                if (changes.Any())
-                {
-                    var (userId, username) = GetAuditInfo();
-                    await _auditLogService.LogActionAsync(
-                        action: "UPDATE",
-                        entityType: "Product",
-                        entityId: product.ProductId,
-                        entityName: product.ProductName,
-                        oldValues: oldValues,
-                        newValues: new
-                        {
-                            ProductId = product.ProductId,
-                            ProductName = product.ProductName,
-                            Barcode = product.Barcode,
-                            Price = product.Price,
-                            CostPrice = product.CostPrice,
-                            CategoryId = product.CategoryId,
-                            SupplierId = product.SupplierId,
-                            Unit = product.Unit,
-                            Status = product.Status
-                        },
-                        changesSummary: $"Cập nhật sản phẩm '{product.ProductName}': {string.Join(", ", changes)}",
-                        userId: userId,
-                        username: username
-                    );
-                }
-
                 await transaction.CommitAsync();
                 return await GetProductByIdAsync(id);
             }
@@ -463,18 +408,7 @@ namespace StoreManagementAPI.Services
                     product.Status = "inactive";
                     await _productRepository.UpdateAsync(product);
 
-                    // Log audit
-                    await _auditLogService.LogActionAsync(
-                        action: "SOFT_DELETE",
-                        entityType: "Product",
-                        entityId: product.ProductId,
-                        entityName: product.ProductName,
-                        oldValues: new { Status = oldStatus },
-                        newValues: new { Status = "inactive" },
-                        changesSummary: $"Ẩn sản phẩm '{product.ProductName}' (đã có đơn hàng, không thể xóa hẳn)",
-                        userId: userId,
-                        username: username
-                    );
+                    
 
                     await transaction.CommitAsync();
 
@@ -500,18 +434,7 @@ namespace StoreManagementAPI.Services
 
                 if (deleted)
                 {
-                    // Log audit
-                    await _auditLogService.LogActionAsync(
-                        action: "DELETE",
-                        entityType: "Product",
-                        entityId: product.ProductId,
-                        entityName: product.ProductName,
-                        oldValues: productInfo,
-                        newValues: null,
-                        changesSummary: $"Xóa vĩnh viễn sản phẩm '{product.ProductName}' (Barcode: {product.Barcode})",
-                        userId: userId,
-                        username: username
-                    );
+                    
 
                     await transaction.CommitAsync();
 
@@ -632,3 +555,4 @@ namespace StoreManagementAPI.Services
         }
     }
 }
+

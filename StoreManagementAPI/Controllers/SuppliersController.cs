@@ -1,4 +1,4 @@
-// using Microsoft.AspNetCore.Authorization;
+﻿// using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StoreManagementAPI.Data;
@@ -23,26 +23,6 @@ namespace StoreManagementAPI.Controllers
             _supplierRepository = supplierRepository;
             _context = context;
             _supplierService = supplierService;
-        }
-
-        private void LogAudit(string action, string entity, int? entityId, string? entityName, string changesSummary, object? oldValues, object? newValues)
-        {
-            var auditLog = new AuditLog
-            {
-                Action = action,
-                EntityType = entity,
-                EntityId = entityId,
-                EntityName = entityName,
-                ChangesSummary = changesSummary,
-                OldValues = oldValues != null ? JsonSerializer.Serialize(oldValues) : null,
-                NewValues = newValues != null ? JsonSerializer.Serialize(newValues) : null,
-                CreatedAt = DateTime.Now,
-                UserId = 1,
-                Username = "admin"
-            };
-
-            _context.AuditLogs.Add(auditLog);
-            _context.SaveChanges();
         }
 
         [HttpGet]
@@ -94,25 +74,6 @@ namespace StoreManagementAPI.Controllers
         {
             var created = await _supplierRepository.AddAsync(supplier);
             
-            // Log audit
-            LogAudit(
-                action: "CREATE",
-                entity: "Supplier",
-                entityId: created.SupplierId,
-                entityName: created.Name,
-                changesSummary: $"Tạo nhà cung cấp mới: {created.Name} (SĐT: {created.Phone})",
-                oldValues: null,
-                newValues: new
-                {
-                    created.SupplierId,
-                    created.Name,
-                    created.Phone,
-                    created.Email,
-                    created.Address,
-                    created.Status
-                }
-            );
-            
             return CreatedAtAction(nameof(GetById), new { id = created.SupplierId }, created);
         }
 
@@ -141,25 +102,7 @@ namespace StoreManagementAPI.Controllers
 
             var updated = await _supplierRepository.UpdateAsync(existing);
             
-            // Log audit
-            LogAudit(
-                action: "UPDATE",
-                entity: "Supplier",
-                entityId: id,
-                entityName: updated.Name,
-                changesSummary: $"Cập nhật nhà cung cấp: {oldName} → {updated.Name}",
-                oldValues: oldValues,
-                newValues: new
-                {
-                    updated.SupplierId,
-                    updated.Name,
-                    updated.Phone,
-                    updated.Email,
-                    updated.Address,
-                    updated.Status
-                }
-            );
-            
+            // Log audit            
             return Ok(updated);
         }
 
@@ -171,19 +114,7 @@ namespace StoreManagementAPI.Controllers
             if (supplier == null) return NotFound();
 
             supplier.Status = "active";
-            var updated = await _supplierRepository.UpdateAsync(supplier);
-
-            LogAudit(
-                action: "RESTORE",
-                entity: "Supplier",
-                entityId: id,
-                entityName: supplier.Name,
-                changesSummary: $"Khôi phục nhà cung cấp: {supplier.Name}",
-                oldValues: new { Status = "inactive" },
-                newValues: new { Status = "active" }
-            );
-
-            return Ok(new
+            var updated = await _supplierRepository.UpdateAsync(supplier);            return Ok(new
             {
                 message = "Khôi phục nhà cung cấp thành công",
                 supplier = updated
@@ -205,19 +136,7 @@ namespace StoreManagementAPI.Controllers
             };
 
             supplier.Status = "inactive";
-            var updated = await _supplierRepository.UpdateAsync(supplier);
-
-            LogAudit(
-                action: "HIDE",
-                entity: "Supplier",
-                entityId: id,
-                entityName: supplier.Name,
-                changesSummary: $"Ẩn nhà cung cấp: {supplier.Name}",
-                oldValues: oldValues,
-                newValues: new { supplier.Status }
-            );
-
-            return Ok(new
+            var updated = await _supplierRepository.UpdateAsync(supplier);            return Ok(new
             {
                 message = "Đã ẩn nhà cung cấp thành công",
                 supplier = updated
@@ -254,17 +173,6 @@ namespace StoreManagementAPI.Controllers
                 supplier.Status = "inactive";
                 await _supplierRepository.UpdateAsync(supplier);
                 
-                // Log audit
-                LogAudit(
-                    action: "DELETE",
-                    entity: "Supplier",
-                    entityId: id,
-                    entityName: supplier.Name,
-                    changesSummary: $"Ẩn nhà cung cấp (có dữ liệu liên quan): {supplier.Name}",
-                    oldValues: deletedValues,
-                    newValues: new { supplier.Status }
-                );
-                
                 return Ok(new 
                 { 
                     message = "Nhà cung cấp có dữ liệu liên quan nên đã được ẩn thay vì xóa",
@@ -277,17 +185,6 @@ namespace StoreManagementAPI.Controllers
                 // Không có liên quan -> xóa hẳn
                 var result = await _supplierRepository.DeleteAsync(id);
                 if (!result) return NotFound();
-                
-                // Log audit
-                LogAudit(
-                    action: "DELETE",
-                    entity: "Supplier",
-                    entityId: id,
-                    entityName: supplier.Name,
-                    changesSummary: $"Xóa nhà cung cấp: {supplier.Name}",
-                    oldValues: deletedValues,
-                    newValues: null
-                );
                 
                 return Ok(new 
                 { 

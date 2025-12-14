@@ -1,8 +1,8 @@
 -- ============================================
 -- STORE MANAGEMENT DATABASE - COMPLETE SETUP
--- Hệ thống quản lý cửa hàng bán lẻ - Phiên bản hoàn chỉnh
--- Cập nhật: 2025-10-13
--- Đặc điểm: 1 kho duy nhất, xóa mềm với status
+-- Hệ thống quản lý cửa hàng bán lẻ - Phiên bản hoàn chỉnh  
+-- Cập nhật: 2025-12-14
+-- Đặc điểm: 1 kho duy nhất, xóa mềm với status, đã xóa audit log
 -- ============================================
 
 DROP DATABASE IF EXISTS store_management;
@@ -209,31 +209,7 @@ CREATE TABLE purchase_items (
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
--- Audit Logs - Nhật ký hệ thống
-CREATE TABLE audit_logs (
-    audit_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    username VARCHAR(50),
-    action VARCHAR(50) NOT NULL,
-    entity_type VARCHAR(50) NOT NULL,
-    entity_id INT,
-    entity_name VARCHAR(255),
-    old_values TEXT,
-    new_values TEXT,
-    changes_summary TEXT,
-    ip_address VARCHAR(50),
-    user_agent VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    additional_info TEXT,
-    INDEX idx_user_id (user_id),
-    INDEX idx_username (username),
-    INDEX idx_action (action),
-    INDEX idx_entity_type (entity_type),
-    INDEX idx_entity_id (entity_id),
-    INDEX idx_created_at (created_at),
-    INDEX idx_entity_type_id (entity_type, entity_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
-) ENGINE=InnoDB;
+
 
 -- ============================================
 -- INSERT INITIAL DATA
@@ -576,19 +552,7 @@ UPDATE inventory SET quantity = quantity - 2 WHERE product_id = 23;  -- Thớt: 
 UPDATE inventory SET quantity = quantity - 5 WHERE product_id = 24;  -- Sữa tươi: 180 - 5 = 175
 UPDATE inventory SET quantity = quantity - 4 WHERE product_id = 25;  -- Yaourt: 160 - 4 = 156
 
--- ============================================
--- AUDIT LOGS (Mẫu)
--- ============================================
 
-INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, entity_name, new_values, changes_summary, ip_address) VALUES
-(1, 'admin', 'LOGIN', 'Auth', NULL, NULL, '{"username":"admin","loginTime":"2025-10-01 08:00:00"}', 'Admin đăng nhập hệ thống', '192.168.1.100'),
-(2, 'staff01', 'LOGIN', 'Auth', NULL, NULL, '{"username":"staff01","loginTime":"2025-10-01 08:15:00"}', 'Nhân viên staff01 đăng nhập', '192.168.1.101'),
-(1, 'admin', 'CREATE', 'PurchaseOrder', 1, 'Đơn nhập từ Công ty Cổ phần Đồ uống Sài Gòn', '{"supplier_id":2,"total_amount":3025000,"status":"completed"}', 'Tạo đơn nhập hàng #1 trị giá 3,025,000 VNĐ', '192.168.1.100'),
-(2, 'staff01', 'CREATE', 'Order', 1, 'Đơn hàng #1', '{"customer_id":1,"total_amount":152500,"discount_amount":15250}', 'Tạo đơn bán hàng #1 cho khách hàng Nguyễn Văn An', '192.168.1.101'),
-(3, 'staff02', 'CREATE', 'Order', 2, 'Đơn hàng #2', '{"customer_id":2,"total_amount":84000}', 'Tạo đơn bán hàng #2 cho khách hàng Trần Thị Bình', '192.168.1.102'),
-(3, 'staff02', 'UPDATE', 'Order', 8, 'Đơn hàng #8', '{"status":"canceled"}', 'Hủy đơn hàng #8', '192.168.1.102'),
-(1, 'admin', 'CREATE', 'Product', 1, 'Coca Cola 330ml', '{"barcode":"8934588180019","price":12000,"cost_price":9000}', 'Thêm sản phẩm Coca Cola 330ml', '192.168.1.100'),
-(2, 'staff01', 'UPDATE', 'Inventory', 1, 'Coca Cola 330ml - Kho Chính', '{"old_quantity":100,"new_quantity":95}', 'Giảm tồn kho Coca Cola từ 100 xuống 95', '192.168.1.101');
 
 -- ============================================
 -- VIEWS - Báo cáo thống kê

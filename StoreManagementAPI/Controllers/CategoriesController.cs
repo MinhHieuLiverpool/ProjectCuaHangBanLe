@@ -1,4 +1,4 @@
-// using Microsoft.AspNetCore.Authorization;
+﻿// using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StoreManagementAPI.Data;
@@ -21,26 +21,6 @@ namespace StoreManagementAPI.Controllers
         {
             _categoryRepository = categoryRepository;
             _context = context;
-        }
-
-        private void LogAudit(string action, string entity, int? entityId, string? entityName, string changesSummary, object? oldValues, object? newValues)
-        {
-            var auditLog = new AuditLog
-            {
-                Action = action,
-                EntityType = entity,
-                EntityId = entityId,
-                EntityName = entityName,
-                ChangesSummary = changesSummary,
-                OldValues = oldValues != null ? JsonSerializer.Serialize(oldValues) : null,
-                NewValues = newValues != null ? JsonSerializer.Serialize(newValues) : null,
-                CreatedAt = DateTime.Now,
-                UserId = 1,
-                Username = "admin"
-            };
-
-            _context.AuditLogs.Add(auditLog);
-            _context.SaveChanges();
         }
 
         [HttpGet]
@@ -136,22 +116,7 @@ namespace StoreManagementAPI.Controllers
 
             // 🧾 Ghi log audit
             try
-            {
-                LogAudit(
-                    action: "CREATE",
-                    entity: "Category",
-                    entityId: created.CategoryId,
-                    entityName: created.CategoryName,
-                    changesSummary: $"Tạo danh mục mới: {created.CategoryName}",
-                    oldValues: null,
-                    newValues: new
-                    {
-                        created.CategoryId,
-                        created.CategoryName,
-                        created.Status
-                    }
-                );
-            }
+            {            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Audit log error: {ex.Message}");
@@ -191,22 +156,6 @@ namespace StoreManagementAPI.Controllers
             existing.CategoryName = category.CategoryName;
 
             var updated = await _categoryRepository.UpdateAsync(existing);
-
-            // 🧾 Ghi log audit
-            LogAudit(
-                action: "UPDATE",
-                entity: "Category",
-                entityId: id,
-                entityName: updated.CategoryName,
-                changesSummary: $"Cập nhật danh mục: {oldName} → {updated.CategoryName}",
-                oldValues: oldValues,
-                newValues: new
-                {
-                    updated.CategoryId,
-                    updated.CategoryName,
-                    updated.Status
-                }
-            );
 
             return Ok(updated);
         }
@@ -296,17 +245,6 @@ namespace StoreManagementAPI.Controllers
 
                         product.CategoryId = newCategoryId;
                         _context.Products.Update(product);
-
-                        // Log audit cho mỗi sản phẩm được đổi
-                        LogAudit(
-                            action: "UPDATE",
-                            entity: "Product",
-                            entityId: product.ProductId,
-                            entityName: product.ProductName,
-                            changesSummary: $"Chuyển sản phẩm từ danh mục {category.CategoryName} sang {newCategory.CategoryName}",
-                            oldValues: new { CategoryId = oldCategoryId },
-                            newValues: new { CategoryId = newCategoryId }
-                        );
                     }
                 }
 
@@ -325,17 +263,6 @@ namespace StoreManagementAPI.Controllers
                 {
                     product.Status = "inactive";
                     _context.Products.Update(product);
-
-                    // Log audit
-                    LogAudit(
-                        action: "UPDATE",
-                        entity: "Product",
-                        entityId: product.ProductId,
-                        entityName: product.ProductName,
-                        changesSummary: $"Ẩn sản phẩm do ẩn danh mục {category.CategoryName}",
-                        oldValues: new { Status = "active" },
-                        newValues: new { Status = "inactive" }
-                    );
                 }
 
                 await _context.SaveChangesAsync();
@@ -344,17 +271,7 @@ namespace StoreManagementAPI.Controllers
             // Luôn luôn chỉ ẩn category (soft delete), không xóa hẳn
             category.Status = "inactive";
             await _categoryRepository.UpdateAsync(category);
-
-            LogAudit(
-                action: "HIDE",
-                entity: "Category",
-                entityId: id,
-                entityName: category.CategoryName,
-                changesSummary: $"Ẩn danh mục: {category.CategoryName}",
-                oldValues: oldValues,
-                newValues: new { category.Status }
-            );
-
+            
             return Ok(new CategoryDeleteResponseDto
             {
                 Success = true,

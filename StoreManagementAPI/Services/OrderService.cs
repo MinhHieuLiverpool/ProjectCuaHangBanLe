@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using StoreManagementAPI.Data;
 using StoreManagementAPI.DTOs;
 using StoreManagementAPI.Models;
@@ -23,9 +23,7 @@ namespace StoreManagementAPI.Services
         private readonly IRepository<OrderItem> _orderItemRepository;
         private readonly IRepository<Payment> _paymentRepository;
         private readonly IRepository<Inventory> _inventoryRepository;
-        private readonly IRepository<Promotion> _promotionRepository;
-        private readonly IAuditLogService _auditLogService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IRepository<Promotion> _promotionRepository;        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public OrderService(
             StoreDbContext context,
@@ -34,7 +32,6 @@ namespace StoreManagementAPI.Services
             IRepository<Payment> paymentRepository,
             IRepository<Inventory> inventoryRepository,
             IRepository<Promotion> promotionRepository,
-            IAuditLogService auditLogService,
             IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
@@ -42,9 +39,7 @@ namespace StoreManagementAPI.Services
             _orderItemRepository = orderItemRepository;
             _paymentRepository = paymentRepository;
             _inventoryRepository = inventoryRepository;
-            _promotionRepository = promotionRepository;
-            _auditLogService = auditLogService;
-            _httpContextAccessor = httpContextAccessor;
+            _promotionRepository = promotionRepository;            _httpContextAccessor = httpContextAccessor;
         }
 
         private (int? userId, string? username) GetAuditInfo()
@@ -308,45 +303,7 @@ namespace StoreManagementAPI.Services
                     await _orderItemRepository.AddAsync(item);
                 }
 
-                await _context.SaveChangesAsync();
-
-                // Log audit
-                var (auditUserId, auditUsername) = GetAuditInfo();
-                var itemsInfo = orderItems.Select(oi => new
-                {
-                    ProductId = oi.ProductId,
-                    Quantity = oi.Quantity,
-                    Price = oi.Price,
-                    Subtotal = oi.Subtotal
-                }).ToList();
-
-                await _auditLogService.LogActionAsync(
-                    action: "CREATE",
-                    entityType: "Order",
-                    entityId: createdOrder.OrderId,
-                    entityName: $"DH{createdOrder.OrderId:D6}",
-                    oldValues: null,
-                    newValues: new
-                    {
-                        OrderId = createdOrder.OrderId,
-                        CustomerId = createdOrder.CustomerId,
-                        TotalAmount = createdOrder.TotalAmount,
-                        DiscountAmount = createdOrder.DiscountAmount,
-                        Status = createdOrder.Status,
-                        ItemCount = orderItems.Count,
-                        Items = itemsInfo
-                    },
-                    changesSummary: $"Tạo đơn hàng DH{createdOrder.OrderId:D6} - Khách hàng ID {createdOrder.CustomerId} - Tổng tiền: {createdOrder.TotalAmount:N0} VNĐ - {orderItems.Count} sản phẩm",
-                    userId: auditUserId,
-                    username: auditUsername,
-                    additionalInfo: new Dictionary<string, object>
-                    {
-                        { "ItemCount", orderItems.Count },
-                        { "HasPromotion", createdOrder.PromoId.HasValue }
-                    }
-                );
-
-                await transaction.CommitAsync();
+                await _context.SaveChangesAsync();                await transaction.CommitAsync();
 
                 return await GetOrderByIdAsync(createdOrder.OrderId);
             }
@@ -466,23 +423,7 @@ namespace StoreManagementAPI.Services
 
             var oldStatus = order.Status;
             order.Status = status;
-            await _orderRepository.UpdateAsync(order);
-
-            // Log audit
-            var (userId, username) = GetAuditInfo();
-            await _auditLogService.LogActionAsync(
-                action: "UPDATE",
-                entityType: "Order",
-                entityId: orderId,
-                entityName: $"DH{orderId:D6}",
-                oldValues: new { Status = oldStatus },
-                newValues: new { Status = status },
-                changesSummary: $"Cập nhật trạng thái đơn hàng DH{orderId:D6}: {oldStatus} → {status}",
-                userId: userId,
-                username: username
-            );
-
-            return true;
+            await _orderRepository.UpdateAsync(order);            return true;
         }
 
         public async Task<bool> ProcessPaymentAsync(PaymentDto dto)
@@ -503,28 +444,7 @@ namespace StoreManagementAPI.Services
             // Update order status
             var oldStatus = order.Status;
             order.Status = "paid";
-            await _orderRepository.UpdateAsync(order);
-
-            // Log audit
-            var (userId, username) = GetAuditInfo();
-            await _auditLogService.LogActionAsync(
-                action: "PAYMENT",
-                entityType: "Order",
-                entityId: dto.OrderId,
-                entityName: $"DH{dto.OrderId:D6}",
-                oldValues: new { Status = oldStatus, PaidAmount = 0 },
-                newValues: new { Status = "paid", PaidAmount = dto.Amount },
-                changesSummary: $"Thanh toán đơn hàng DH{dto.OrderId:D6} - Số tiền: {dto.Amount:N0} VNĐ - Phương thức: {dto.PaymentMethod}",
-                userId: userId,
-                username: username,
-                additionalInfo: new Dictionary<string, object>
-                {
-                    { "PaymentMethod", dto.PaymentMethod },
-                    { "Amount", dto.Amount }
-                }
-            );
-
-            return true;
+            await _orderRepository.UpdateAsync(order);            return true;
         }
     }
 }

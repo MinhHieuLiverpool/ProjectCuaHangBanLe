@@ -1,6 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
 import {
-  AuditOutlined,
   BarChartOutlined,
   DashboardOutlined,
   GiftOutlined,
@@ -88,11 +87,6 @@ const MainLayout: React.FC = () => {
             key: "/users",
             icon: <UserOutlined />,
             label: "Tài Khoản",
-          },
-          {
-            key: "/audit-logs",
-            icon: <AuditOutlined />,
-            label: "Audit Log",
           },
         ]
       : []),

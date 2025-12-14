@@ -19,7 +19,6 @@ import PromotionsPage from "./pages/PromotionsPage";
 import StockReceiptsPage from "./pages/StockReceiptsPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import UsersPage from "./pages/UsersPage";
-import AuditLogsPage from "./pages/AuditLogsPage";
 import StatisticsPage from "./pages/StatisticsPage";
 
 function App() {
@@ -78,14 +77,6 @@ function App() {
             />
 
             <Route path="stock-receipts" element={<StockReceiptsPage />} />
-            <Route
-              path="audit-logs"
-              element={
-                <PrivateRoute requireAdmin>
-                  <AuditLogsPage />
-                </PrivateRoute>
-              }
-            />
           </Route>
         </Routes>
       </Router>

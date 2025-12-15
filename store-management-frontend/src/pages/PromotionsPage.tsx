@@ -1,10 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Space, message, Popconfirm, Tooltip, Tag } from "antd";
+import {
+  Table,
+  Button,
+  Space,
+  message,
+  Popconfirm,
+  Tooltip,
+  Tag,
+  Input,
+  Select,
+  Row,
+  Col,
+} from "antd";
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   EyeOutlined,
+  SearchOutlined,
+  EyeInvisibleOutlined,
 } from "@ant-design/icons";
 import { Promotion } from "@/types";
 import { promotionService } from "@/services/common.service";
@@ -22,10 +36,21 @@ const PromotionsPage: React.FC = () => {
   const [viewingPromotion, setViewingPromotion] = useState<Promotion | null>(
     null
   );
+  const [searchKeyword, setSearchKeyword] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Tự động tìm kiếm khi thay đổi keyword hoặc status filter
+  useEffect(() => {
+    const delaySearch = setTimeout(() => {
+      handleSearch();
+    }, 500); // Debounce 500ms để tránh gọi API quá nhiều
+
+    return () => clearTimeout(delaySearch);
+  }, [searchKeyword, statusFilter]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -39,6 +64,32 @@ const PromotionsPage: React.FC = () => {
     }
   };
 
+  const handleSearch = async () => {
+    setLoading(true);
+    try {
+      const params: any = {};
+      if (searchKeyword.trim()) {
+        params.keyword = searchKeyword.trim();
+      }
+      if (statusFilter && statusFilter !== "all") {
+        params.promotionStatus = statusFilter;
+      }
+
+      const data = await promotionService.search(params);
+      setPromotions(data);
+    } catch (error) {
+      message.error("Tìm kiếm thất bại!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetSearch = () => {
+    setSearchKeyword("");
+    setStatusFilter("all");
+    fetchData();
+  };
+
   const handleCreate = () => {
     setEditingPromotion(null);
     setModalVisible(true);
@@ -49,13 +100,18 @@ const PromotionsPage: React.FC = () => {
     setModalVisible(true);
   };
 
-  const handleDelete = async (promoId: number) => {
+  const handleHide = async (promoId: number) => {
     try {
       await promotionService.delete(promoId);
-      message.success("Xóa khuyến mãi thành công!");
-      fetchData();
+      message.success("Ẩn khuyến mãi thành công!");
+      // Sau khi ẩn, nếu đang có filter thì search lại, không thì fetch all
+      if (searchKeyword.trim() || (statusFilter && statusFilter !== "all")) {
+        handleSearch();
+      } else {
+        fetchData();
+      }
     } catch (error) {
-      message.error("Xóa khuyến mãi thất bại!");
+      message.error("Ẩn khuyến mãi thất bại!");
     }
   };
 
@@ -64,7 +120,12 @@ const PromotionsPage: React.FC = () => {
   };
 
   const handleModalSuccess = () => {
-    fetchData();
+    // Sau khi tạo/sửa thành công, nếu đang có filter thì search lại, không thì fetch all
+    if (searchKeyword.trim() || (statusFilter && statusFilter !== "all")) {
+      handleSearch();
+    } else {
+      fetchData();
+    }
   };
 
   const handleViewDetail = (promotion: Promotion) => {
@@ -83,33 +144,42 @@ const PromotionsPage: React.FC = () => {
     const startDate = new Date(promotion.startDate);
     const endDate = new Date(promotion.endDate);
 
-    // Kiểm tra chưa bắt đầu
-    if (now < startDate) {
+    // Sử dụng promotionStatus từ backend nếu có
+    const promotionStatus = (promotion as any).promotionStatus || "";
+
+    // 1. Đã ẩn (hidden)
+    if (promotionStatus === "hidden" || promotion.status === "hidden") {
       return {
-        text: "Chưa bắt đầu",
+        text: "Đã ẩn",
+        color: "gray",
+        tooltip: "Khuyến mãi đã bị ẩn",
+      };
+    }
+
+    // 2. Chưa đến (upcoming)
+    if (promotionStatus === "upcoming" || now < startDate) {
+      return {
+        text: "Chưa đến",
         color: "orange",
         tooltip: `Sẽ bắt đầu từ ${startDate.toLocaleDateString("vi-VN")}`,
       };
     }
 
-    // Đang áp dụng
-    if (promotion.status === "active") {
-      return {
-        text: "Đang áp dụng",
-        color: "green",
-        tooltip: "Khuyến mãi đang hoạt động",
-      };
-    } else {
-      // Inactive = Hết hạn
+    // 3. Hết hạn (expired)
+    if (promotionStatus === "expired" || now > endDate) {
       return {
         text: "Hết hạn",
         color: "red",
-        tooltip:
-          now > endDate
-            ? `Đã quá ngày kết thúc: ${endDate.toLocaleDateString("vi-VN")}`
-            : "Khuyến mãi đã ngừng hoạt động",
+        tooltip: `Đã quá ngày kết thúc: ${endDate.toLocaleDateString("vi-VN")}`,
       };
     }
+
+    // 4. Đang áp dụng (active)
+    return {
+      text: "Đang áp dụng",
+      color: "green",
+      tooltip: "Khuyến mãi đang hoạt động",
+    };
   };
 
   const columns = [
@@ -255,6 +325,7 @@ const PromotionsPage: React.FC = () => {
           green: "#52c41a",
           orange: "#faad14",
           red: "#ff4d4f",
+          gray: "#8c8c8c",
         };
         return (
           <Tooltip title={statusInfo.tooltip}>
@@ -276,39 +347,52 @@ const PromotionsPage: React.FC = () => {
       key: "action",
       width: 150,
       align: "center" as const,
-      render: (_: any, record: Promotion) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => handleViewDetail(record)}
-            style={{ fontSize: "13px" }}
-          >
-            Chi tiết
-          </Button>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-            style={{ fontSize: "13px" }}
-          >
-            Sửa
-          </Button>
-          <Popconfirm
-            title="Bạn có chắc muốn xóa?"
-            onConfirm={() => handleDelete(record.promoId)}
-          >
+      render: (_: any, record: Promotion) => {
+        const promotionStatus = (record as any).promotionStatus || "";
+        const isHidden =
+          promotionStatus === "hidden" || record.status === "hidden";
+
+        return (
+          <Space>
             <Button
               type="link"
-              danger
-              icon={<DeleteOutlined />}
+              icon={<EyeOutlined />}
+              onClick={() => handleViewDetail(record)}
               style={{ fontSize: "13px" }}
             >
-              Xóa
+              Chi tiết
             </Button>
-          </Popconfirm>
-        </Space>
-      ),
+            {!isHidden && (
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => handleEdit(record)}
+                style={{ fontSize: "13px" }}
+              >
+                Sửa
+              </Button>
+            )}
+            {!isHidden && (
+              <Popconfirm
+                title="Bạn có chắc muốn ẩn khuyến mãi này?"
+                description="Khuyến mãi sẽ không bị xóa hoàn toàn, chỉ được ẩn đi."
+                onConfirm={() => handleHide(record.promoId)}
+                okText="Ẩn"
+                cancelText="Hủy"
+              >
+                <Button
+                  type="link"
+                  danger
+                  icon={<EyeInvisibleOutlined />}
+                  style={{ fontSize: "13px" }}
+                >
+                  Ẩn
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -326,6 +410,48 @@ const PromotionsPage: React.FC = () => {
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           Thêm khuyến mãi
         </Button>
+      </div>
+
+      {/* Bộ lọc tìm kiếm */}
+      <div
+        style={{
+          marginBottom: 16,
+          padding: "16px",
+          background: "#f5f5f5",
+          borderRadius: "8px",
+        }}
+      >
+        <Row gutter={16}>
+          <Col span={12}>
+            <Input
+              placeholder="Tìm kiếm theo mã hoặc mô tả khuyến mãi"
+              prefix={<SearchOutlined />}
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              onPressEnter={handleSearch}
+              allowClear
+            />
+          </Col>
+          <Col span={8}>
+            <Select
+              placeholder="Lọc theo trạng thái"
+              style={{ width: "100%" }}
+              value={statusFilter}
+              onChange={setStatusFilter}
+            >
+              <Select.Option value="all">Tất cả trạng thái</Select.Option>
+              <Select.Option value="upcoming">Chưa đến</Select.Option>
+              <Select.Option value="active">Đang áp dụng</Select.Option>
+              <Select.Option value="expired">Hết hạn</Select.Option>
+              <Select.Option value="hidden">Đã ẩn</Select.Option>
+            </Select>
+          </Col>
+          <Col span={4}>
+            <Space>
+              <Button onClick={handleResetSearch}>Làm mới</Button>
+            </Space>
+          </Col>
+        </Row>
       </div>
 
       <Table

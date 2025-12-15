@@ -58,6 +58,27 @@ namespace StoreManagementAPI.Controllers
             return (finalUserId, username);
         }
 
+        // Helper method để tính toán trạng thái thực tế của promotion
+        private string CalculatePromotionStatus(Promotion promotion)
+        {
+            // Nếu đã bị ẩn, trả về hidden
+            if (promotion.Status == "hidden")
+                return "hidden";
+
+            var now = DateTime.Now;
+
+            // Chưa đến thời gian bắt đầu
+            if (promotion.StartDate > now)
+                return "upcoming";
+
+            // Đã hết hạn
+            if (promotion.EndDate < now)
+                return "expired";
+
+            // Đang còn hạn
+            return "active";
+        }
+
         [HttpGet]
         // [AllowAnonymous] - B? AUTHENTICATION
         public async Task<ActionResult<IEnumerable<PromotionDto>>> GetAll()
@@ -83,6 +104,97 @@ namespace StoreManagementAPI.Controllers
                 UsageLimit = p.UsageLimit,
                 UsedCount = p.UsedCount,
                 Status = p.Status,
+                PromotionStatus = CalculatePromotionStatus(p),
+                ApplyType = p.ApplyType,
+                Products = p.PromotionProducts.Select(pp => new ProductSimpleDto
+                {
+                    ProductId = pp.ProductId,
+                    ProductName = pp.Product?.ProductName ?? ""
+                }).ToList()
+            }).ToList();
+
+            return Ok(promotionDtos);
+        }
+
+        [HttpGet("search")]
+        public async Task<ActionResult<IEnumerable<PromotionDto>>> Search([FromQuery] PromotionSearchDto searchDto)
+        {
+            var query = _context.Promotions
+                .Include(p => p.PromotionProducts)
+                .ThenInclude(pp => pp.Product)
+                .AsQueryable();
+
+            // Tìm kiếm theo keyword (mã hoặc mô tả)
+            if (!string.IsNullOrEmpty(searchDto.Keyword))
+            {
+                query = query.Where(p =>
+                    p.PromoCode.Contains(searchDto.Keyword) ||
+                    (p.Description != null && p.Description.Contains(searchDto.Keyword)));
+            }
+
+            // Lọc theo thể loại giảm giá
+            if (!string.IsNullOrEmpty(searchDto.DiscountType))
+            {
+                query = query.Where(p => p.DiscountType == searchDto.DiscountType);
+            }
+
+            // Lọc theo loại áp dụng
+            if (!string.IsNullOrEmpty(searchDto.ApplyType))
+            {
+                query = query.Where(p => p.ApplyType == searchDto.ApplyType);
+            }
+
+            // Lọc theo thời gian
+            if (searchDto.FromDate.HasValue)
+            {
+                query = query.Where(p => p.StartDate >= searchDto.FromDate.Value);
+            }
+
+            if (searchDto.ToDate.HasValue)
+            {
+                query = query.Where(p => p.EndDate <= searchDto.ToDate.Value);
+            }
+
+            // Lọc theo trạng thái khuyến mãi
+            var now = DateTime.Now;
+            if (!string.IsNullOrEmpty(searchDto.PromotionStatus))
+            {
+                switch (searchDto.PromotionStatus.ToLower())
+                {
+                    case "upcoming": // Chưa đến
+                        query = query.Where(p => p.StartDate > now && p.Status != "hidden");
+                        break;
+                    case "active": // Đang còn hạn
+                        query = query.Where(p =>
+                            p.StartDate <= now &&
+                            p.EndDate >= now &&
+                            p.Status != "hidden");
+                        break;
+                    case "expired": // Hết hạn
+                        query = query.Where(p => p.EndDate < now && p.Status != "hidden");
+                        break;
+                    case "hidden": // Đã ẩn
+                        query = query.Where(p => p.Status == "hidden");
+                        break;
+                }
+            }
+
+            var promotions = await query.ToListAsync();
+
+            var promotionDtos = promotions.Select(p => new PromotionDto
+            {
+                PromoId = p.PromoId,
+                PromoCode = p.PromoCode,
+                Description = p.Description,
+                DiscountType = p.DiscountType,
+                DiscountValue = p.DiscountValue,
+                StartDate = p.StartDate,
+                EndDate = p.EndDate,
+                MinOrderAmount = p.MinOrderAmount,
+                UsageLimit = p.UsageLimit,
+                UsedCount = p.UsedCount,
+                Status = p.Status,
+                PromotionStatus = CalculatePromotionStatus(p),
                 ApplyType = p.ApplyType,
                 Products = p.PromotionProducts.Select(pp => new ProductSimpleDto
                 {
@@ -98,9 +210,9 @@ namespace StoreManagementAPI.Controllers
         // [AllowAnonymous] - B? AUTHENTICATION
         public async Task<ActionResult<IEnumerable<Promotion>>> GetActive()
         {
-            var promotions = await _promotionRepository.FindAsync(p => 
-                p.Status == "active" && 
-                p.StartDate <= DateTime.Now && 
+            var promotions = await _promotionRepository.FindAsync(p =>
+                p.Status == "active" &&
+                p.StartDate <= DateTime.Now &&
                 p.EndDate >= DateTime.Now);
             return Ok(promotions);
         }
@@ -128,6 +240,7 @@ namespace StoreManagementAPI.Controllers
                 UsageLimit = promotion.UsageLimit,
                 UsedCount = promotion.UsedCount,
                 Status = promotion.Status,
+                PromotionStatus = CalculatePromotionStatus(promotion),
                 ApplyType = promotion.ApplyType,
                 Products = promotion.PromotionProducts.Select(pp => new ProductSimpleDto
                 {
@@ -153,6 +266,18 @@ namespace StoreManagementAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<PromotionDto>> Create([FromBody] CreatePromotionDto createDto)
         {
+            // Validation: Số lượng sử dụng phải > 0
+            if (!createDto.UsageLimit.HasValue || createDto.UsageLimit.Value <= 0)
+            {
+                return BadRequest("Số lượng sử dụng phải lớn hơn 0.");
+            }
+
+            // Validation: Ngày kết thúc phải lớn hơn ngày bắt đầu
+            if (createDto.EndDate <= createDto.StartDate)
+            {
+                return BadRequest("Ngày kết thúc phải lớn hơn ngày bắt đầu.");
+            }
+
             // Tạo Promotion mới
             var promotion = new Promotion
             {
@@ -206,6 +331,7 @@ namespace StoreManagementAPI.Controllers
                 UsageLimit = promotionWithProducts.UsageLimit,
                 UsedCount = promotionWithProducts.UsedCount,
                 Status = promotionWithProducts.Status,
+                PromotionStatus = CalculatePromotionStatus(promotionWithProducts),
                 ApplyType = promotionWithProducts.ApplyType,
                 Products = promotionWithProducts.PromotionProducts.Select(pp => new ProductSimpleDto
                 {
@@ -224,6 +350,15 @@ namespace StoreManagementAPI.Controllers
                 .FirstOrDefaultAsync(p => p.PromoId == id);
 
             if (existing == null) return NotFound();
+
+            // Validation: Nếu cập nhật EndDate, phải đảm bảo EndDate > StartDate
+            if (updateDto.EndDate.HasValue)
+            {
+                if (updateDto.EndDate.Value <= existing.StartDate)
+                {
+                    return BadRequest("Ngày kết thúc phải lớn hơn ngày bắt đầu.");
+                }
+            }
 
             // Lưu giá trị cũ để audit
             var oldValues = new
@@ -277,11 +412,8 @@ namespace StoreManagementAPI.Controllers
                 existing.MinOrderAmount = updateDto.MinOrderAmount.Value;
             }
 
-            if (!string.IsNullOrEmpty(updateDto.Status) && existing.Status != updateDto.Status)
-            {
-                changes.Add($"Trạng thái: {existing.Status} → {updateDto.Status}");
-                existing.Status = updateDto.Status;
-            }
+            // Không cho phép cập nhật Status qua Update API
+            // Chỉ có thể ẩn promotion thông qua Delete API
 
             // Cập nhật ApplyType
             if (!string.IsNullOrEmpty(updateDto.ApplyType) && existing.ApplyType != updateDto.ApplyType)
@@ -348,6 +480,7 @@ namespace StoreManagementAPI.Controllers
                 UsageLimit = updatedPromotion.UsageLimit,
                 UsedCount = updatedPromotion.UsedCount,
                 Status = updatedPromotion.Status,
+                PromotionStatus = CalculatePromotionStatus(updatedPromotion),
                 ApplyType = updatedPromotion.ApplyType,
                 Products = updatedPromotion.PromotionProducts.Select(pp => new ProductSimpleDto
                 {
@@ -363,32 +496,18 @@ namespace StoreManagementAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<ActionResult> Delete(int id)
         {
-            // Lấy thông tin promotion trước khi xóa
+            // Soft delete: Đổi status thành 'hidden' thay vì xóa thật
             var promotion = await _context.Promotions
                 .Include(p => p.PromotionProducts)
                 .FirstOrDefaultAsync(p => p.PromoId == id);
 
             if (promotion == null) return NotFound();
 
-            var promotionInfo = new
-            {
-                PromoId = promotion.PromoId,
-                PromoCode = promotion.PromoCode,
-                Description = promotion.Description,
-                DiscountType = promotion.DiscountType,
-                DiscountValue = promotion.DiscountValue,
-                StartDate = promotion.StartDate,
-                EndDate = promotion.EndDate,
-                MinOrderAmount = promotion.MinOrderAmount,
-                UsageLimit = promotion.UsageLimit,
-                UsedCount = promotion.UsedCount,
-                Status = promotion.Status,
-                ApplyType = promotion.ApplyType,
-                ProductCount = promotion.PromotionProducts.Count
-            };
+            // Đổi status thành hidden
+            promotion.Status = "hidden";
+            await _context.SaveChangesAsync();
 
-            var result = await _promotionRepository.DeleteAsync(id);
-            if (!result) return NotFound();            return Ok(new { message = "Promotion deleted successfully" });
+            return Ok(new { message = "Promotion hidden successfully" });
         }
     }
 }

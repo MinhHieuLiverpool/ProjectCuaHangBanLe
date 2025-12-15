@@ -183,6 +183,19 @@ export const promotionService = {
     const response = await apiClient.get<Promotion>(`/promotions/code/${code}`);
     return response.data;
   },
+  async search(params: {
+    keyword?: string;
+    discountType?: string;
+    applyType?: string;
+    fromDate?: string;
+    toDate?: string;
+    promotionStatus?: string;
+  }): Promise<Promotion[]> {
+    const response = await apiClient.get<Promotion[]>("/promotions/search", {
+      params,
+    });
+    return response.data;
+  },
   async create(
     data: Omit<Promotion, "promoId" | "usedCount">
   ): Promise<Promotion> {

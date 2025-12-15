@@ -53,6 +53,10 @@ namespace StoreManagementAPI.Services
             if (promotion == null)
                 return false;
 
+            // Nếu đã bị ẩn, không cập nhật trạng thái
+            if (promotion.Status == "hidden")
+                return false;
+
             var today = DateTime.Now.Date;
             var startDate = promotion.StartDate.Date;
             var endDate = promotion.EndDate.Date;
